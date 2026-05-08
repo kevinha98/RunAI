@@ -37,8 +37,15 @@ function createGatewayClient(): Anthropic {
   });
 }
 
-// Singleton — safe for Next.js edge/serverless (created fresh per cold start)
-export const llm = createGatewayClient();
+// Lazy singleton — created on first use so missing env vars throw at request
+// time (caught by the route handler) rather than crashing the module.
+let _llm: Anthropic | null = null;
+export const llm = new Proxy({} as Anthropic, {
+  get(_target, prop) {
+    if (!_llm) _llm = createGatewayClient();
+    return (_llm as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
 
 /** Model IDs available on the Radical Gateway */
 export const MODELS = {
