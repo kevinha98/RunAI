@@ -71,7 +71,7 @@ export default async function PlanPage() {
 
 
 
-      <div className="flex-1 ml-60 p-8">
+      <div className="flex-1 md:ml-60 p-4 md:p-8">
 
         {/* Header */}
 
