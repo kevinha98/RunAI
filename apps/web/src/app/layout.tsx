@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -8,6 +8,10 @@ const notoSans = Noto_Sans({
   weight: ["300", "400", "500", "600", "700", "800", "900"],
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  themeColor: "#0D0D0C",
+};
 
 export const metadata: Metadata = {
   title: {
@@ -23,7 +27,6 @@ export const metadata: Metadata = {
     type: "website",
     locale: "nb_NO",
   },
-  themeColor: "#0D0D0C",
 };
 
 export default function RootLayout({
