@@ -22,13 +22,13 @@ const STRAVA_ORANGE = "#FC5200";
 const RACE_DATE = "2027-04-24";
 
 const PLAN_SESSIONS = [
-  { day: "Man", dayIdx: 1, type: "Lett lÃ¸ping", distance: "8 km", pace: "5:45/km" },
-  { day: "Tir", dayIdx: 2, type: "Styrke", distance: "45 min", pace: "LÃ¸peÃ¸velser" },
-  { day: "Ons", dayIdx: 3, type: "TerskellÃ¸kt", distance: "10 km", pace: "4:50/km" },
-  { day: "Tor", dayIdx: 4, type: "Hvile", distance: "â€”", pace: "Restitusjon" },
-  { day: "Fre", dayIdx: 5, type: "Lett lÃ¸ping", distance: "6 km", pace: "5:50/km" },
-  { day: "LÃ¸r", dayIdx: 6, type: "LangkjÃ¸ring", distance: "18 km", pace: "6:00/km" },
-  { day: "SÃ¸n", dayIdx: 0, type: "Hvile", distance: "â€”", pace: "Restitusjon" },
+  { day: "Man", dayIdx: 1, type: "Lett løping", distance: "8 km", pace: "5:45/km" },
+  { day: "Tir", dayIdx: 2, type: "Styrke", distance: "45 min", pace: "Løpeøvelser" },
+  { day: "Ons", dayIdx: 3, type: "Terskelløkt", distance: "10 km", pace: "4:50/km" },
+  { day: "Tor", dayIdx: 4, type: "Hvile", distance: "—", pace: "Restitusjon" },
+  { day: "Fre", dayIdx: 5, type: "Lett løping", distance: "6 km", pace: "5:50/km" },
+  { day: "Lør", dayIdx: 6, type: "Langkjøring", distance: "18 km", pace: "6:00/km" },
+  { day: "Søn", dayIdx: 0, type: "Hvile", distance: "—", pace: "Restitusjon" },
 ];
 
 // Helpers
@@ -45,7 +45,7 @@ function formatMovingTime(secs: number) {
   return `${m}m`;
 }
 function activityPace(a: { distance: number; moving_time: number }) {
-  if (!a.distance || !a.moving_time) return "â€”";
+  if (!a.distance || !a.moving_time) return "—";
   return formatPace(a.moving_time / (a.distance / 1000));
 }
 function activityPaceSec(a: { distance: number; moving_time: number }) {
@@ -104,7 +104,7 @@ function BarChart({ data, color = STRAVA_ORANGE }: {
 
 function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
   const last10 = runs.slice(0, 10).reverse().filter((r) => r.distance > 0 && r.moving_time > 0);
-  if (last10.length < 2) return <p className="text-xs text-[#6B6B65]">Trenger minst 2 lÃ¸p</p>;
+  if (last10.length < 2) return <p className="text-xs text-[#6B6B65]">Trenger minst 2 løp</p>;
 
   const paces = last10.map((r) => activityPaceSec(r));
   const maxP = Math.max(...paces);
@@ -129,7 +129,7 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
           ? <TrendingUp size={13} className="text-red-400" />
           : <Activity size={13} className="text-[#6B6B65]" />}
         <span className="text-xs text-[#6B6B65]">
-          {trend < -5 ? "Farten forbedres" : trend > 5 ? "Farten synker" : "Stabil fart"} Â· siste {last10.length} lÃ¸p
+          {trend < -5 ? "Farten forbedres" : trend > 5 ? "Farten synker" : "Stabil fart"} · siste {last10.length} løp
         </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H + 24}`} className="w-full" style={{ overflow: "visible" }}>
@@ -270,16 +270,16 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
       <div className="hidden md:flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-black tracking-tight">
-            {athleteName ? `God dag, ${athleteName} ðŸ‘‹` : "God dag ðŸ‘‹"}
+            {athleteName ? `God dag, ${athleteName} 👋` : "God dag 👋"}
           </h1>
-          <p className="text-[#6B6B65] text-sm mt-1">{daysUntilRace} dager til lÃ¸psdagen Â· Bergen City Marathon</p>
+          <p className="text-[#6B6B65] text-sm mt-1">{daysUntilRace} dager til løpsdagen · Bergen City Marathon</p>
         </div>
         <Link
           href="/dashboard/coach"
           className="flex items-center gap-2 bg-white border border-[#E5E5E2] hover:border-[rgba(252,82,0,0.40)] px-4 py-2.5 rounded-xl text-sm transition-colors"
         >
           <MessageCircle size={14} className="text-[#FC5200]" />
-          SpÃ¸r treneren din
+          Spør treneren din
         </Link>
       </div>
 
@@ -289,10 +289,10 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
           <div>
             <div className="text-xs text-[#FC5200] font-bold uppercase tracking-widest mb-1">I dag</div>
             <h2 className="text-lg font-black tracking-tight">{today.type}</h2>
-            <p className="text-[#6B6B65] text-sm">{today.distance} Â· MÃ¥lfart {today.pace}</p>
+            <p className="text-[#6B6B65] text-sm">{today.distance} · Målfart {today.pace}</p>
           </div>
           <Link href="/dashboard/plan" className="flex items-center gap-2 bg-[#FC5200] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-[#E04800] transition-colors shrink-0">
-            <Play size={14} /> Vis Ã¸kt
+            <Play size={14} /> Vis økt
           </Link>
         </div>
       )}
@@ -309,9 +309,9 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
               unit="/km"
               sub={paceDelta !== 0
                 ? paceDelta > 0
-                  ? `â–² ${Math.round(Math.abs(paceDelta))}s raskere`
-                  : `â–¼ ${Math.round(Math.abs(paceDelta))}s tregere`
-                : "Siste 5 lÃ¸p"}
+                  ? `▲ ${Math.round(Math.abs(paceDelta))}s raskere`
+                  : `▼ ${Math.round(Math.abs(paceDelta))}s tregere`
+                : "Siste 5 løp"}
               subColor={paceDelta > 0 ? "text-emerald-500" : paceDelta < 0 ? "text-red-400" : "text-[#6B6B65]"}
             />
             <StatCard
@@ -324,16 +324,16 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
             <StatCard
               icon={<TrendingUp size={14} className="text-blue-500" />}
               label="Snitt km/t"
-              value={avgSpeedKmh > 0 ? avgSpeedKmh.toFixed(1) : "â€”"}
+              value={avgSpeedKmh > 0 ? avgSpeedKmh.toFixed(1) : "—"}
               unit="km/t"
-              sub="Gjennomsnitt alle lÃ¸p"
+              sub="Gjennomsnitt alle løp"
             />
             <StatCard
               icon={<Heart size={14} className="text-red-400" />}
               label="Snitt puls"
-              value={avgHR ? String(avgHR) : "â€”"}
+              value={avgHR ? String(avgHR) : "—"}
               unit="bpm"
-              sub={avgHR ? "Gjennomsnitt siste lÃ¸p" : "Ingen HR-data"}
+              sub={avgHR ? "Gjennomsnitt siste løp" : "Ingen HR-data"}
             />
           </div>
 
@@ -344,14 +344,14 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
               label="Denne uken"
               value={computed.weeklyKm.toFixed(1)}
               unit="km"
-              sub={`${computed.weeklyRuns} Ã¸kt${computed.weeklyRuns !== 1 ? "er" : ""}`}
+              sub={`${computed.weeklyRuns} økt${computed.weeklyRuns !== 1 ? "er" : ""}`}
             />
             <StatCard
               icon={<Activity size={14} className="text-[#FC5200]" />}
-              label="Hittil i Ã¥r"
+              label="Hittil i år"
               value={computed.ytdKm.toFixed(0)}
               unit="km"
-              sub={recentRunCount > 0 ? `${recentRunCount} lÃ¸p (4 uker)` : `${computed.totalRunsAllTime} lÃ¸p totalt`}
+              sub={recentRunCount > 0 ? `${recentRunCount} løp (4 uker)` : `${computed.totalRunsAllTime} løp totalt`}
             />
             <StatCard
               icon={<TrendingUp size={14} className="text-[#FC5200]" />}
@@ -362,8 +362,8 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
             />
             <StatCard
               icon={<Activity size={14} className="text-purple-500" />}
-              label="Snitt per lÃ¸p"
-              value={avgRunDistKm > 0 ? avgRunDistKm.toFixed(1) : "â€”"}
+              label="Snitt per løp"
+              value={avgRunDistKm > 0 ? avgRunDistKm.toFixed(1) : "—"}
               unit="km"
               sub="Gjennomsnittlig distanse"
             />
@@ -373,29 +373,29 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <StatCard
               icon={<Mountain size={14} className="text-emerald-600" />}
-              label="HÃ¸ydemeter (mnd)"
-              value={totalElevationMonth > 0 ? String(Math.round(totalElevationMonth)) : "â€”"}
+              label="Høydemeter (mnd)"
+              value={totalElevationMonth > 0 ? String(Math.round(totalElevationMonth)) : "—"}
               unit="m"
-              sub="Denne mÃ¥neden"
+              sub="Denne måneden"
             />
             <StatCard
               icon={<Mountain size={14} className="text-emerald-500" />}
-              label="HÃ¸ydemeter (Ã¥r)"
-              value={ytdElevation > 0 ? String(ytdElevation) : "â€”"}
+              label="Høydemeter (år)"
+              value={ytdElevation > 0 ? String(ytdElevation) : "—"}
               unit="m"
-              sub="Hittil i Ã¥r"
+              sub="Hittil i år"
             />
             <StatCard
               icon={<Activity size={14} className="text-[#FC5200]" />}
               label="Totalt km"
-              value={computed.totalKmAllTime > 0 ? computed.totalKmAllTime.toFixed(0) : "â€”"}
+              value={computed.totalKmAllTime > 0 ? computed.totalKmAllTime.toFixed(0) : "—"}
               unit="km"
               sub="Alle tider"
             />
             <StatCard
               icon={<BarChart2 size={14} className="text-[#FC5200]" />}
-              label="Totalt lÃ¸p"
-              value={computed.totalRunsAllTime ? String(computed.totalRunsAllTime) : "â€”"}
+              label="Totalt løp"
+              value={computed.totalRunsAllTime ? String(computed.totalRunsAllTime) : "—"}
               unit=""
               sub="Alle tider"
             />
@@ -406,7 +406,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-sm">Ukentlig volum</h3>
-                <span className="text-xs text-[#6B6B65]">Siste 8 uker Â· km</span>
+                <span className="text-xs text-[#6B6B65]">Siste 8 uker · km</span>
               </div>
               {weeklyBuckets.length >= 2 ? (
                 <BarChart data={weeklyBuckets.map((b) => ({ label: `U${b.label}`, value: b.km }))} />
@@ -418,7 +418,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-sm">Fartsutvikling</h3>
-                <span className="text-xs text-[#6B6B65]">Siste 10 lÃ¸p</span>
+                <span className="text-xs text-[#6B6B65]">Siste 10 løp</span>
               </div>
               <PaceTrendChart runs={recentRuns} />
             </div>
@@ -430,7 +430,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <StravaIcon />
-                  <h3 className="font-bold text-sm">Siste lÃ¸p</h3>
+                  <h3 className="font-bold text-sm">Siste løp</h3>
                 </div>
                 <Link href="/dashboard/progress" className="text-xs text-[#FC5200] flex items-center gap-1 hover:underline font-semibold">
                   Se fremgang <ChevronRight size={12} />
@@ -445,7 +445,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
                       <th className="text-right pb-2 font-semibold pr-3">Dist</th>
                       <th className="text-right pb-2 font-semibold pr-3">Fart</th>
                       <th className="text-right pb-2 font-semibold pr-3">Tid</th>
-                      <th className="text-right pb-2 font-semibold pr-3">HÃ¸yde</th>
+                      <th className="text-right pb-2 font-semibold pr-3">Høyde</th>
                       <th className="text-right pb-2 font-semibold pr-3">Puls</th>
                       <th className="text-right pb-2 font-semibold">km/t</th>
                     </tr>
@@ -462,13 +462,13 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
                         <td className="py-2.5 pr-3 text-right font-mono whitespace-nowrap text-[#FC5200]">{activityPace(run)}/km</td>
                         <td className="py-2.5 pr-3 text-right whitespace-nowrap">{formatMovingTime(run.moving_time)}</td>
                         <td className="py-2.5 pr-3 text-right whitespace-nowrap text-emerald-600">
-                          {run.total_elevation_gain ? `${Math.round(run.total_elevation_gain)}m` : "â€”"}
+                          {run.total_elevation_gain ? `${Math.round(run.total_elevation_gain)}m` : "—"}
                         </td>
                         <td className="py-2.5 pr-3 text-right whitespace-nowrap text-red-400">
-                          {run.average_heartrate ? `â™¥ ${Math.round(run.average_heartrate)}` : "â€”"}
+                          {run.average_heartrate ? `♥ ${Math.round(run.average_heartrate)}` : "—"}
                         </td>
                         <td className="py-2.5 text-right whitespace-nowrap text-blue-500">
-                          {run.average_speed ? mpsToKmh(run.average_speed) : "â€”"}
+                          {run.average_speed ? mpsToKmh(run.average_speed) : "—"}
                         </td>
                       </tr>
                     ))}
@@ -483,7 +483,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
           <div className="flex justify-center mb-3"><StravaIcon /></div>
           <h3 className="font-bold mb-2">Koble Strava for analyser</h3>
           <p className="text-sm text-[#6B6B65] mb-5 max-w-sm mx-auto">
-            Koble til Strava for Ã¥ se fart, puls, hÃ¸ydemeter, ukentlig volum og lÃ¸pstrender.
+            Koble til Strava for å se fart, puls, høydemeter, ukentlig volum og løpstrender.
           </p>
           <a href="/api/strava/connect" className="inline-flex items-center gap-2 bg-[#FC5200] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-[#E04800] transition-colors">
             Koble til Strava
@@ -521,10 +521,10 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-[#6B6B65]">{d.distance} Â· {d.pace}</span>
+                  <span className="text-xs text-[#6B6B65]">{d.distance} · {d.pace}</span>
                 </div>
                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#C8C8C4]"}`}>
-                  {d.done && <span className="text-white text-xs">âœ“</span>}
+                  {d.done && <span className="text-white text-xs">✓</span>}
                 </div>
               </div>
             ))}
@@ -539,12 +539,12 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
             </div>
             <div>
               <h3 className="font-bold text-sm">AI-trener</h3>
-              <span className="text-xs text-[#FC5200] font-semibold">â— Online</span>
+              <span className="text-xs text-[#FC5200] font-semibold">● Online</span>
             </div>
           </div>
           <div className="flex-1 space-y-2.5 mb-4">
             <div className="bg-[#F2F2F0] rounded-xl p-3 text-xs text-[#6B6B65] leading-relaxed">
-              &ldquo;Jeg analyserer treningsdataene dine og tilpasser planen lÃ¸pende.&rdquo;
+              &ldquo;Jeg analyserer treningsdataene dine og tilpasser planen løpende.&rdquo;
             </div>
             <div className="bg-[#F2F2F0] rounded-xl p-3 text-xs text-[#6B6B65] leading-relaxed">
               &ldquo;Still meg om fart, skader, plan-justeringer eller hva som helst.&rdquo;
