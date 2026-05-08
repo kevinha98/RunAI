@@ -106,4 +106,46 @@ export function computeMetrics(
   };
 }
 
+// ─── Per-user DB-backed read/write (multi-user / Supabase) ──────────────────
+
+/**
+ * Read stats for a specific user from Supabase DB.
+ * Falls back to EMPTY_STATS if the user hasn't connected Strava yet.
+ */
+export async function readUserStats(userId: string): Promise<StoredStats> {
+  try {
+    const { getUserStrava } = await import("@/lib/db/user-strava");
+    const record = await getUserStrava(userId);
+    if (!record) return EMPTY_STATS;
+
+    return {
+      lastSync: record.last_sync ?? "",
+      athlete: record.athlete,
+      stravaStats: record.strava_stats,
+      recentActivities: record.recent_activities ?? [],
+      recentRuns: record.recent_runs ?? [],
+      computed: record.computed ?? EMPTY_STATS.computed,
+    };
+  } catch (err) {
+    console.error("[stats-store] readUserStats error:", err);
+    return EMPTY_STATS;
+  }
+}
+
+/**
+ * Write stats for a specific user to Supabase DB.
+ * Called after a full Strava sync.
+ */
+export async function writeUserStats(userId: string, stats: StoredStats): Promise<void> {
+  const { updateUserStravaStats } = await import("@/lib/db/user-strava");
+  await updateUserStravaStats(userId, {
+    athlete: stats.athlete ?? undefined,
+    strava_stats: stats.stravaStats ?? undefined,
+    recent_runs: stats.recentRuns,
+    recent_activities: stats.recentActivities,
+    computed: stats.computed,
+    last_sync: stats.lastSync || null,
+  });
+}
+
 

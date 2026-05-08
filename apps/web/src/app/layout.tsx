@@ -10,7 +10,7 @@ const notoSans = Noto_Sans({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#0D0D0C",
+  themeColor: "#F5F5F3",
 };
 
 export const metadata: Metadata = {
@@ -35,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="no" className="dark">
+    <html lang="no">
       <body className={`${notoSans.variable} antialiased`}>
         {children}
       </body>

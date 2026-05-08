@@ -1,5 +1,7 @@
-import DashboardSidebar from "../DashboardSidebar";
-import { readStats } from "@/lib/stats-store";
+﻿import DashboardSidebar from "../DashboardSidebar";
+import { readUserStats } from "@/lib/stats-store";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { Calendar, CheckCircle, Clock, Zap, Activity, Heart } from "lucide-react";
 import Link from "next/link";
 
@@ -191,10 +193,13 @@ const PHASE_COLORS: Record<Phase, string> = {
 };
 
 export default async function PlanPage() {
-  const stats = await Promise.resolve(readStats());
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const stats = await readUserStats(user.id);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0C] text-[#F2F2F0] flex">
+    <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex">
       <DashboardSidebar stats={stats} activePath="/dashboard/plan" />
 
       <div className="flex-1 ml-60 p-8">
@@ -205,13 +210,13 @@ export default async function PlanPage() {
               <Calendar size={22} className="text-[#FC5200]" />
               Treningsplan
             </h1>
-            <p className="text-[#9A9A92] text-sm mt-1">
+            <p className="text-[#6B6B65] text-sm mt-1">
               12-ukers halvmaratonplan &middot; Uke {CURRENT_WEEK} av 12
             </p>
           </div>
           <Link
             href="/onboarding"
-            className="text-xs text-[#9A9A92] border border-[#2E2E29] hover:border-[rgba(252,82,0,0.40)] hover:text-[#FC5200] px-4 py-2.5 rounded-xl transition-colors"
+            className="text-xs text-[#6B6B65] border border-[#E5E5E2] hover:border-[rgba(252,82,0,0.40)] hover:text-[#FC5200] px-4 py-2.5 rounded-xl transition-colors"
           >
             Generer ny plan
           </Link>
@@ -240,19 +245,19 @@ export default async function PlanPage() {
                 key={w.week}
                 className={`rounded-2xl border transition-colors ${
                   isCurrent
-                    ? "border-[rgba(252,82,0,0.30)] bg-[#1A1A17]"
-                    : "border-[#2E2E29] bg-[#111110]"
+                    ? "border-[rgba(252,82,0,0.30)] bg-white"
+                    : "border-[#E5E5E2] bg-white"
                 }`}
               >
                 {/* Week header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-[#2E2E29]">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E5E2]">
                   <div className="flex items-center gap-3">
                     {isPast ? (
                       <CheckCircle size={15} className="text-emerald-400" />
                     ) : (
                       <span
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold ${
-                          isCurrent ? "border-[#FC5200] text-[#FC5200]" : "border-[#3A3A35] text-[#5A5A54]"
+                          isCurrent ? "border-[#FC5200] text-[#FC5200]" : "border-[#D0D0CC] text-[#6B6B65]"
                         }`}
                       >
                         {w.week}
@@ -275,25 +280,25 @@ export default async function PlanPage() {
                     >
                       {w.phase}
                     </span>
-                    <span className="text-sm text-[#9A9A92] font-semibold">{w.totalKm} km</span>
+                    <span className="text-sm text-[#6B6B65] font-semibold">{w.totalKm} km</span>
                   </div>
                 </div>
 
                 {/* Sessions — only show for current week expanded, others collapsed */}
                 {(isCurrent || isPast) && (
-                  <div className="grid grid-cols-7 divide-x divide-[#2E2E29]">
+                  <div className="grid grid-cols-7 divide-x divide-[#E5E5E2]">
                     {w.sessions.map((s) => (
                       <div key={s.day} className="p-3 text-center">
-                        <div className="text-[10px] font-bold text-[#5A5A54] mb-1">{s.day}</div>
+                        <div className="text-[10px] font-bold text-[#6B6B65] mb-1">{s.day}</div>
                         <div className="text-lg mb-1">{s.icon}</div>
                         <div
                           className={`text-[10px] font-semibold leading-tight ${
-                            s.type === "Hvile" ? "text-[#3A3A35]" : "text-[#F2F2F0]"
+                            s.type === "Hvile" ? "text-[#C8C8C4]" : "text-[#111110]"
                           }`}
                         >
                           {s.type}
                         </div>
-                        <div className="text-[10px] text-[#5A5A54] mt-0.5">{s.distance}</div>
+                        <div className="text-[10px] text-[#6B6B65] mt-0.5">{s.distance}</div>
                       </div>
                     ))}
                   </div>
@@ -301,7 +306,7 @@ export default async function PlanPage() {
 
                 {/* Future weeks — compact summary */}
                 {!isCurrent && !isPast && (
-                  <div className="px-5 py-3 flex items-center gap-2 text-xs text-[#5A5A54]">
+                  <div className="px-5 py-3 flex items-center gap-2 text-xs text-[#6B6B65]">
                     <Clock size={11} />
                     {w.sessions.filter((s) => s.type !== "Hvile" && s.type !== "Mobilitet").length} trenings\u00f8kter
                     &middot;
@@ -318,7 +323,7 @@ export default async function PlanPage() {
         <div className="mt-6 bg-gradient-to-br from-[rgba(252,82,0,0.12)] to-[rgba(252,82,0,0.04)] border border-[rgba(252,82,0,0.30)] rounded-2xl p-6 text-center">
           <div className="text-3xl mb-2">🏅</div>
           <h3 className="font-black text-lg tracking-tight">L\u00f8psdag — 22. august 2026</h3>
-          <p className="text-sm text-[#9A9A92] mt-1">M\u00e5l: sub 2:00 halvmaraton</p>
+          <p className="text-sm text-[#6B6B65] mt-1">M\u00e5l: sub 2:00 halvmaraton</p>
         </div>
       </div>
     </div>

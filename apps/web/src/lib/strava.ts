@@ -19,6 +19,11 @@ export interface StravaTokens {
   expires_at: number; // Unix timestamp (seconds)
 }
 
+/** Token response from the authorization_code exchange (also includes athlete) */
+export interface StravaTokenResponse extends StravaTokens {
+  athlete?: StravaAthlete;
+}
+
 export interface StravaAthlete {
   id: number;
   firstname: string;
@@ -119,6 +124,68 @@ async function refreshAccessToken(): Promise<string> {
   return tokens.access_token;
 }
 
+// ─── Per-user token management (multi-user / Supabase DB) ───────────────────
+
+/**
+ * Refresh using an explicit refresh token (for per-user DB-backed auth).
+ * Returns full token set so caller can persist them.
+ */
+export async function refreshTokensForUser(refreshToken: string): Promise<StravaTokens> {
+  const clientId = process.env.STRAVA_CLIENT_ID;
+  const clientSecret = process.env.STRAVA_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing STRAVA_CLIENT_ID or STRAVA_CLIENT_SECRET");
+  }
+
+  const res = await fetch(STRAVA_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Strava token refresh failed (${res.status}): ${text}`);
+  }
+
+  return res.json() as Promise<StravaTokens>;
+}
+
+/**
+ * Returns a valid Strava access token for a specific user.
+ * Reads their tokens from Supabase DB, refreshes if expired, and saves updated tokens back.
+ */
+export async function getValidAccessTokenForUser(userId: string): Promise<string> {
+  // Lazy import to avoid circular deps at module level
+  const { getUserStrava, upsertUserStrava } = await import("@/lib/db/user-strava");
+
+  const record = await getUserStrava(userId);
+  if (!record) {
+    throw new Error("No Strava connection found. Please connect Strava first.");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (now < record.token_expires_at - 60) {
+    return record.access_token;
+  }
+
+  // Token expired — refresh
+  const newTokens = await refreshTokensForUser(record.refresh_token);
+  await upsertUserStrava(userId, {
+    access_token: newTokens.access_token,
+    refresh_token: newTokens.refresh_token,
+    token_expires_at: newTokens.expires_at,
+  });
+
+  return newTokens.access_token;
+}
+
 // ─── API helpers ────────────────────────────────────────────────────────────
 
 async function stravaFetch<T>(path: string, params?: Record<string, string | number>): Promise<T> {
@@ -177,6 +244,21 @@ export async function getActivities(opts?: {
   return stravaFetch<StravaActivity[]>("/athlete/activities", params);
 }
 
+/** Fetch ALL activities by paginating until Strava returns an empty page */
+export async function getAllActivities(): Promise<StravaActivity[]> {
+  const all: StravaActivity[] = [];
+  let page = 1;
+  const perPage = 200; // Strava max per page
+  while (true) {
+    const batch = await getActivities({ perPage, page });
+    if (batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < perPage) break; // last page
+    page++;
+  }
+  return all;
+}
+
 /** Fetch a single activity by ID */
 export async function getActivity(id: number): Promise<StravaActivity> {
   return stravaFetch<StravaActivity>(`/activities/${id}`);
@@ -197,7 +279,7 @@ export function buildAuthUrl(redirectUri: string): string {
 }
 
 /** Exchange an authorization code for tokens (used in the OAuth callback) */
-export async function exchangeCodeForTokens(code: string): Promise<StravaTokens> {
+export async function exchangeCodeForTokens(code: string): Promise<StravaTokenResponse> {
   const res = await fetch(STRAVA_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -214,5 +296,64 @@ export async function exchangeCodeForTokens(code: string): Promise<StravaTokens>
     throw new Error(`Strava code exchange failed (${res.status}): ${text}`);
   }
 
-  return res.json() as Promise<StravaTokens>;
+  return res.json() as Promise<StravaTokenResponse>;
+}
+
+// ─── Per-user API helpers ────────────────────────────────────────────────────
+
+/** Strava fetch using a pre-validated access token */
+async function stravaFetchWithToken<T>(
+  token: string,
+  path: string,
+  params?: Record<string, string | number>
+): Promise<T> {
+  const url = new URL(`${STRAVA_BASE}${path}`);
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+  }
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+    next: { revalidate: 300 },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Strava API error ${res.status} on ${path}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function getAthleteForUser(userId: string): Promise<StravaAthlete> {
+  const token = await getValidAccessTokenForUser(userId);
+  return stravaFetchWithToken<StravaAthlete>(token, "/athlete");
+}
+
+export async function getAthleteStatsForUser(
+  userId: string,
+  athleteId: number
+): Promise<StravaStats> {
+  const token = await getValidAccessTokenForUser(userId);
+  return stravaFetchWithToken<StravaStats>(token, `/athletes/${athleteId}/stats`);
+}
+
+export async function getAllActivitiesForUser(userId: string): Promise<StravaActivity[]> {
+  const token = await getValidAccessTokenForUser(userId);
+  const all: StravaActivity[] = [];
+  let page = 1;
+  const perPage = 200;
+  while (true) {
+    const batch = await stravaFetchWithToken<StravaActivity[]>(token, "/athlete/activities", {
+      per_page: perPage,
+      page,
+    });
+    if (batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < perPage) break;
+    page++;
+  }
+  return all;
+}
+
+export async function getActivityForUser(userId: string, activityId: number): Promise<StravaActivity> {
+  const token = await getValidAccessTokenForUser(userId);
+  return stravaFetchWithToken<StravaActivity>(token, `/activities/${activityId}`);
 }

@@ -1,6 +1,8 @@
-import DashboardClient from "./DashboardClient";
+﻿import DashboardClient from "./DashboardClient";
 import DashboardSidebar from "./DashboardSidebar";
-import { readStats } from "@/lib/stats-store";
+import { readUserStats } from "@/lib/stats-store";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +11,14 @@ interface PageProps {
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
-  const stats = readStats();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const stats = await readUserStats(user.id);
   const params = await searchParams;
   return (
-    <div className="min-h-screen bg-[#0D0D0C] text-[#F2F2F0] flex">
+    <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex">
       <DashboardSidebar stats={stats} activePath="/dashboard" />
       <DashboardClient stravaData={stats} stravaStatus={params.strava ?? null} />
     </div>

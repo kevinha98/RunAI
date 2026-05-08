@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import Image from "next/image";
 import { Activity, Calendar, Brain, TrendingUp, Zap, RefreshCw } from "lucide-react";
 import type { StoredStats } from "@/lib/strava-types";
@@ -42,13 +42,13 @@ export default async function DashboardSidebar({ stats, activePath }: Props) {
   const displayEmail = user?.email ?? null;
 
   return (
-    <div className="fixed left-0 top-0 bottom-0 w-60 border-r border-[#2E2E29] bg-[#111110] flex flex-col p-5 z-40">
+    <div className="fixed left-0 top-0 bottom-0 w-60 border-r border-[#E5E5E2] bg-white flex flex-col p-5 z-40">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2.5 mb-8">
         <div className="w-7 h-7 bg-[#FC5200] rounded-lg flex items-center justify-center">
           <span className="text-white font-black text-xs">R</span>
         </div>
-        <span className="font-bold text-[#F2F2F0]">RunAI</span>
+        <span className="font-bold text-[#111110]">RunAI</span>
       </Link>
 
       {/* Nav */}
@@ -61,8 +61,8 @@ export default async function DashboardSidebar({ stats, activePath }: Props) {
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
                 isActive
-                  ? "bg-[rgba(252,82,0,0.12)] text-[#FC5200] font-medium"
-                  : "text-[#9A9A92] hover:text-[#F2F2F0] hover:bg-[#1A1A17]"
+                  ? "bg-[rgba(252,82,0,0.10)] text-[#FC5200] font-medium"
+                  : "text-[#6B6B65] hover:text-[#111110] hover:bg-[#F5F5F3]"
               }`}
             >
               <Icon size={15} />
@@ -73,22 +73,22 @@ export default async function DashboardSidebar({ stats, activePath }: Props) {
       </nav>
 
       {/* Strava + user */}
-      <div className="border-t border-[#2E2E29] pt-4">
+      <div className="border-t border-[#E5E5E2] pt-4">
         {isStravaLinked ? (
-          <div className="px-3 py-2.5 mb-3 rounded-xl bg-[rgba(252,82,0,0.08)] border border-[rgba(252,82,0,0.20)]">
+          <div className="px-3 py-2.5 mb-3 rounded-xl bg-[rgba(252,82,0,0.07)] border border-[rgba(252,82,0,0.18)]">
             <div className="flex items-center gap-2 mb-1">
               <StravaIcon />
               <span className="text-xs text-[#FC5200] font-semibold">Strava tilkoblet</span>
             </div>
             {lastSync && (
-              <div className="text-[10px] text-[#5A5A54] pl-6">
+              <div className="text-[10px] text-[#6B6B65] pl-6">
                 Synk {new Date(lastSync).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
               </div>
             )}
             <form action="/api/strava/sync" method="POST" className="mt-1.5 pl-6">
               <button
                 type="submit"
-                className="flex items-center gap-1 text-[10px] text-[#5A5A54] hover:text-[#FC5200] transition-colors"
+                className="flex items-center gap-1 text-[10px] text-[#6B6B65] hover:text-[#FC5200] transition-colors"
               >
                 <RefreshCw size={9} /> Synkroniser
               </button>
@@ -97,7 +97,7 @@ export default async function DashboardSidebar({ stats, activePath }: Props) {
         ) : (
           <a
             href="/api/strava/connect"
-            className="flex items-center gap-2 px-3 py-2.5 mb-3 rounded-xl border border-[rgba(252,82,0,0.30)] hover:bg-[rgba(252,82,0,0.08)] transition-colors group"
+            className="flex items-center gap-2 px-3 py-2.5 mb-3 rounded-xl border border-[rgba(252,82,0,0.25)] hover:bg-[rgba(252,82,0,0.07)] transition-colors group"
           >
             <StravaIcon />
             <span className="text-xs text-[#FC5200] font-semibold group-hover:underline">
@@ -121,11 +121,11 @@ export default async function DashboardSidebar({ stats, activePath }: Props) {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-[#F2F2F0] truncate">
+            <div className="text-sm font-semibold text-[#111110] truncate">
               {displayName ?? "Bruker"}
             </div>
             {displayEmail && (
-              <div className="text-[10px] text-[#5A5A54] truncate">{displayEmail}</div>
+              <div className="text-[10px] text-[#6B6B65] truncate">{displayEmail}</div>
             )}
           </div>
         </div>

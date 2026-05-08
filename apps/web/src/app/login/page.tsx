@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { createClient } from "@/lib/supabase/client";
 import { useSearchParams } from "next/navigation";
@@ -56,17 +56,17 @@ function LoginForm() {
       )}
 
       {/* Card */}
-      <div className="bg-[#111110] border border-[#2E2E29] rounded-2xl p-8">
+      <div className="bg-white border border-[#E5E5E2] rounded-2xl p-8">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-9 h-9 bg-[#FC5200] rounded-xl flex items-center justify-center shadow-lg shadow-orange-900/40">
             <span className="text-white font-black text-sm">R</span>
           </div>
-          <span className="font-bold text-[#F2F2F0] text-lg">RunAI</span>
+          <span className="font-bold text-[#111110] text-lg">RunAI</span>
         </div>
 
-        <h1 className="text-xl font-black text-[#F2F2F0] mb-1">Logg inn</h1>
-        <p className="text-sm text-[#9A9A92] mb-7">
+        <h1 className="text-xl font-black text-[#111110] mb-1">Logg inn</h1>
+        <p className="text-sm text-[#6B6B65] mb-7">
           Koble til Google-kontoen din for \u00e5 f\u00e5 tilgang til dashbordet.
         </p>
 
@@ -78,7 +78,7 @@ function LoginForm() {
           Fortsett med Google
         </button>
 
-        <p className="text-xs text-[#5A5A54] text-center mt-6 leading-relaxed">
+        <p className="text-xs text-[#6B6B65] text-center mt-6 leading-relaxed">
           Ved \u00e5 logge inn aksepterer du v\u00e5re vilk\u00e5r.
           Kontoen din lagres sikkert via Supabase.
         </p>
@@ -93,10 +93,10 @@ function LoginForm() {
         ].map((f) => (
           <div
             key={f.label}
-            className="bg-[#111110] border border-[#2E2E29] rounded-xl p-3 text-center"
+            className="bg-white border border-[#E5E5E2] rounded-xl p-3 text-center"
           >
             <div className="text-xl mb-1">{f.icon}</div>
-            <div className="text-[10px] text-[#5A5A54] leading-tight">{f.label}</div>
+            <div className="text-[10px] text-[#6B6B65] leading-tight">{f.label}</div>
           </div>
         ))}
       </div>
@@ -106,7 +106,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-[#0D0D0C] text-[#F2F2F0] flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex flex-col items-center justify-center px-4">
       <Suspense>
         <LoginForm />
       </Suspense>

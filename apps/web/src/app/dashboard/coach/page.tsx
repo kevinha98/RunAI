@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -125,10 +125,10 @@ export default function CoachPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0D0D0C] text-[#F2F2F0] flex flex-col">
+    <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-[#2E2E29] bg-[#111110]">
-        <Link href="/dashboard" className="text-[#9A9A92] hover:text-[#F2F2F0] transition-colors">
+      <div className="flex items-center gap-4 px-6 py-4 border-b border-[#E5E5E2] bg-white">
+        <Link href="/dashboard" className="text-[#6B6B65] hover:text-[#111110] transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <div className="flex items-center gap-3">
@@ -159,11 +159,11 @@ export default function CoachPage() {
                 className={`max-w-[80%] rounded-2xl px-4 py-3.5 text-sm leading-relaxed ${
                   message.role === "user"
                     ? "bg-[#FC5200] text-white font-medium"
-                    : "bg-[#1A1A17] border border-[#2E2E29] text-[#F2F2F0]"
+                    : "bg-white border border-[#E5E5E2] text-[#111110]"
                 }`}
               >
                 {message.content || (
-                  <span className="flex items-center gap-2 text-[#9A9A92]">
+                  <span className="flex items-center gap-2 text-[#6B6B65]">
                     <Loader2 size={14} className="animate-spin" />
                     Tenker...
                   </span>
@@ -183,7 +183,7 @@ export default function CoachPage() {
               <button
                 key={q}
                 onClick={() => sendMessage(q)}
-                className="text-xs bg-[#1A1A17] border border-[#2E2E29] hover:border-[rgba(252,82,0,0.40)] px-3.5 py-2 rounded-xl text-[#9A9A92] hover:text-[#F2F2F0] transition-colors"
+                className="text-xs bg-white border border-[#E5E5E2] hover:border-[rgba(252,82,0,0.40)] px-3.5 py-2 rounded-xl text-[#6B6B65] hover:text-[#111110] transition-colors"
               >
                 {q}
               </button>
@@ -193,7 +193,7 @@ export default function CoachPage() {
       )}
 
       {/* Input */}
-      <div className="px-4 py-4 border-t border-[#2E2E29] bg-[#111110]">
+      <div className="px-4 py-4 border-t border-[#E5E5E2] bg-white">
         <div className="max-w-3xl mx-auto flex gap-3">
           <input
             ref={inputRef}
@@ -203,7 +203,7 @@ export default function CoachPage() {
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage(input)}
             placeholder="Spør treneren din om hva som helst..."
             disabled={loading}
-            className="flex-1 bg-[#1A1A17] border border-[#2E2E29] rounded-xl px-4 py-3 text-sm text-[#F2F2F0] placeholder-[#5A5A54] focus:outline-none focus:border-[#FC5200] transition-colors disabled:opacity-50"
+            className="flex-1 bg-white border border-[#E5E5E2] rounded-xl px-4 py-3 text-sm text-[#111110] placeholder-[#A0A09A] focus:outline-none focus:border-[#FC5200] transition-colors disabled:opacity-50"
           />
           <button
             onClick={() => sendMessage(input)}

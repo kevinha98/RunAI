@@ -1,5 +1,7 @@
-import DashboardSidebar from "../DashboardSidebar";
-import { readStats } from "@/lib/stats-store";
+﻿import DashboardSidebar from "../DashboardSidebar";
+import { readUserStats } from "@/lib/stats-store";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { formatPace } from "@/lib/strava-types";
 import type { StravaActivity } from "@/lib/strava-types";
 import { TrendingUp, Activity, Zap } from "lucide-react";
@@ -69,7 +71,10 @@ function getPaceTrend(runs: StravaActivity[]): { date: string; pace: string }[] 
 }
 
 export default async function ProgressPage() {
-  const stats = readStats();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const stats = await readUserStats(user.id);
   const { athlete, computed, recentRuns } = stats;
   const hasData = athlete !== null || recentRuns.length > 0;
 
@@ -78,7 +83,7 @@ export default async function ProgressPage() {
   const paceTrend = getPaceTrend(recentRuns);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0C] text-[#F2F2F0] flex">
+    <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex">
       <DashboardSidebar stats={stats} activePath="/dashboard/progress" />
 
       <div className="flex-1 ml-60 p-8">
@@ -88,17 +93,17 @@ export default async function ProgressPage() {
             <TrendingUp size={22} className="text-[#FC5200]" />
             Fremgang
           </h1>
-          <p className="text-[#9A9A92] text-sm mt-1">
+          <p className="text-[#6B6B65] text-sm mt-1">
             {hasData ? "Basert p\u00e5 Strava-data" : "Koble Strava for \u00e5 se fremgang"}
           </p>
         </div>
 
         {!hasData ? (
           /* No Strava data */
-          <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-8 text-center max-w-md mx-auto">
+          <div className="bg-white border border-[#E5E5E2] rounded-2xl p-8 text-center max-w-md mx-auto">
             <div className="text-4xl mb-4">📊</div>
             <h2 className="font-bold text-lg mb-2">Ingen data enn\u00e5</h2>
-            <p className="text-sm text-[#9A9A92] mb-6">
+            <p className="text-sm text-[#6B6B65] mb-6">
               Koble Strava for \u00e5 se ukentlig km, fartstrend og l\u00f8pshistorikk.
             </p>
             <a
@@ -144,23 +149,23 @@ export default async function ProgressPage() {
               ].map((m) => (
                 <div
                   key={m.label}
-                  className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-5"
+                  className="bg-white border border-[#E5E5E2] rounded-2xl p-5"
                 >
-                  <div className="text-xs text-[#5A5A54] mb-2 font-medium">{m.label}</div>
+                  <div className="text-xs text-[#6B6B65] mb-2 font-medium">{m.label}</div>
                   <div className="flex items-end gap-1 mb-1">
                     <span className="text-2xl font-black tracking-tight">{m.value}</span>
-                    <span className="text-xs text-[#9A9A92] mb-1">{m.unit}</span>
+                    <span className="text-xs text-[#6B6B65] mb-1">{m.unit}</span>
                   </div>
-                  <div className="text-xs text-[#5A5A54]">{m.sub}</div>
+                  <div className="text-xs text-[#6B6B65]">{m.sub}</div>
                 </div>
               ))}
             </div>
 
             {/* Weekly km bar chart */}
-            <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6 mb-6">
+            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-6 mb-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-bold">Ukentlig km \u2014 siste 8 uker</h3>
-                <span className="text-xs text-[#5A5A54]">Fra Strava</span>
+                <span className="text-xs text-[#6B6B65]">Fra Strava</span>
               </div>
               <div className="flex items-end gap-2 h-36">
                 {weeklyBuckets.map((b, i) => {
@@ -168,16 +173,16 @@ export default async function ProgressPage() {
                   const isCurrent = i === weeklyBuckets.length - 1;
                   return (
                     <div key={b.label} className="flex-1 flex flex-col items-center gap-1.5">
-                      <span className="text-xs font-semibold text-[#9A9A92]">
+                      <span className="text-xs font-semibold text-[#6B6B65]">
                         {b.km > 0 ? `${b.km}` : ""}
                       </span>
                       <div
                         className={`w-full rounded-sm transition-all ${
-                          isCurrent ? "bg-[#FC5200]" : "bg-[#2E2E29]"
+                          isCurrent ? "bg-[#FC5200]" : "bg-[#E5E5E2]"
                         }`}
                         style={{ height: `${Math.max(h, b.km > 0 ? 4 : 0)}%` }}
                       />
-                      <span className="text-[10px] text-[#5A5A54] text-center leading-tight">
+                      <span className="text-[10px] text-[#6B6B65] text-center leading-tight">
                         {b.label}
                       </span>
                     </div>
@@ -190,12 +195,12 @@ export default async function ProgressPage() {
             <div className="grid grid-cols-2 gap-6">
               {/* Pace trend */}
               {paceTrend.length > 0 && (
-                <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6">
+                <div className="bg-white border border-[#E5E5E2] rounded-2xl p-6">
                   <h3 className="font-bold mb-4">Fartstrend</h3>
                   <div className="space-y-2">
                     {paceTrend.map((p, i) => (
                       <div key={i} className="flex items-center justify-between text-sm">
-                        <span className="text-[#5A5A54] text-xs">{p.date}</span>
+                        <span className="text-[#6B6B65] text-xs">{p.date}</span>
                         <span className="font-semibold tabular-nums">{p.pace}/km</span>
                       </div>
                     ))}
@@ -204,10 +209,10 @@ export default async function ProgressPage() {
               )}
 
               {/* Recent runs */}
-              <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6">
+              <div className="bg-white border border-[#E5E5E2] rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold">Siste l\u00f8p</h3>
-                  <span className="text-xs text-[#5A5A54]">{recentRuns.length} totalt</span>
+                  <span className="text-xs text-[#6B6B65]">{recentRuns.length} totalt</span>
                 </div>
                 <div className="space-y-2.5">
                   {recentRuns.slice(0, 8).map((run) => {
@@ -222,13 +227,13 @@ export default async function ProgressPage() {
                         key={run.id}
                         className="flex items-center gap-3 text-sm"
                       >
-                        <span className="text-xs text-[#5A5A54] w-14 shrink-0">{date}</span>
+                        <span className="text-xs text-[#6B6B65] w-14 shrink-0">{date}</span>
                         <div className="flex-1 min-w-0">
                           <div className="truncate font-medium text-sm">{run.name}</div>
                         </div>
                         <div className="text-right shrink-0">
                           <div className="font-semibold text-sm">{km} km</div>
-                          <div className="text-xs text-[#5A5A54]">{pace}/km</div>
+                          <div className="text-xs text-[#6B6B65]">{pace}/km</div>
                         </div>
                       </div>
                     );

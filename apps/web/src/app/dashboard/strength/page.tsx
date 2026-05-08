@@ -1,5 +1,7 @@
-import DashboardSidebar from "../DashboardSidebar";
-import { readStats } from "@/lib/stats-store";
+﻿import DashboardSidebar from "../DashboardSidebar";
+import { readUserStats } from "@/lib/stats-store";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { Zap } from "lucide-react";
 
 export const metadata = { title: "Styrke" };
@@ -87,10 +89,13 @@ const WEEKLY_PLAN = [
 ];
 
 export default async function StrengthPage() {
-  const stats = await Promise.resolve(readStats());
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const stats = await readUserStats(user.id);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0C] text-[#F2F2F0] flex">
+    <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex">
       <DashboardSidebar stats={stats} activePath="/dashboard/strength" />
 
       <div className="flex-1 ml-60 p-8">
@@ -100,24 +105,24 @@ export default async function StrengthPage() {
             <Zap size={22} className="text-[#FC5200]" />
             Styrketrening
           </h1>
-          <p className="text-[#9A9A92] text-sm mt-1">
+          <p className="text-[#6B6B65] text-sm mt-1">
             L\u00f8psspesifikke styrke\u00f8kter for bedre ytelse og skadeforebygging
           </p>
         </div>
 
         {/* Weekly plan strip */}
-        <div className="bg-[#111110] border border-[#2E2E29] rounded-2xl p-5 mb-8">
+        <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5 mb-8">
           <h3 className="font-bold text-sm mb-4">Ukentlig styrkeplan</h3>
           <div className="grid grid-cols-7 gap-1">
             {WEEKLY_PLAN.map((d) => (
               <div key={d.day} className="text-center">
-                <div className="text-[10px] font-bold text-[#5A5A54] mb-1.5">
+                <div className="text-[10px] font-bold text-[#6B6B65] mb-1.5">
                   {d.day.slice(0, 3)}
                 </div>
                 <div
                   className={`text-[10px] leading-tight rounded-lg p-1.5 ${
                     d.session.startsWith("\u2014")
-                      ? "text-[#3A3A35] bg-transparent"
+                      ? "text-[#C8C8C4] bg-transparent"
                       : "text-[#FC5200] bg-[rgba(252,82,0,0.08)] font-semibold"
                   }`}
                 >
@@ -133,33 +138,33 @@ export default async function StrengthPage() {
           {SESSIONS.map((session) => (
             <div
               key={session.title}
-              className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl overflow-hidden"
+              className="bg-white border border-[#E5E5E2] rounded-2xl overflow-hidden"
             >
               {/* Session header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[#2E2E29]">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E5E2]">
                 <div className="flex items-center gap-3">
                   <span className="text-xl">{session.icon}</span>
                   <div>
                     <div className="font-bold text-sm">{session.title}</div>
-                    <div className="text-xs text-[#9A9A92]">{session.focus}</div>
+                    <div className="text-xs text-[#6B6B65]">{session.focus}</div>
                   </div>
                 </div>
-                <span className="text-xs text-[#5A5A54] bg-[#222220] px-2.5 py-1 rounded-lg font-semibold">
+                <span className="text-xs text-[#6B6B65] bg-[#F2F2F0] px-2.5 py-1 rounded-lg font-semibold">
                   {session.duration}
                 </span>
               </div>
 
               {/* Exercise list */}
-              <div className="divide-y divide-[#2E2E29]">
+              <div className="divide-y divide-[#E5E5E2]">
                 {session.exercises.map((ex) => (
                   <div key={ex.name} className="px-5 py-3.5 flex items-start gap-4">
                     <div className="flex-1">
                       <div className="text-sm font-semibold">{ex.name}</div>
-                      <div className="text-xs text-[#5A5A54] mt-0.5">{ex.note}</div>
+                      <div className="text-xs text-[#6B6B65] mt-0.5">{ex.note}</div>
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-xs font-bold text-[#FC5200]">{ex.sets} sett</div>
-                      <div className="text-xs text-[#9A9A92]">{ex.reps}</div>
+                      <div className="text-xs text-[#6B6B65]">{ex.reps}</div>
                     </div>
                   </div>
                 ))}
@@ -187,10 +192,10 @@ export default async function StrengthPage() {
               desc: "Styrketrening bryter ned muskel. Restitusjon og s\u00f8vn er der du faktisk blir sterkere.",
             },
           ].map((tip) => (
-            <div key={tip.title} className="bg-[#111110] border border-[#2E2E29] rounded-xl p-4">
+            <div key={tip.title} className="bg-white border border-[#E5E5E2] rounded-xl p-4">
               <div className="text-xl mb-2">{tip.icon}</div>
               <div className="text-sm font-bold mb-1">{tip.title}</div>
-              <div className="text-xs text-[#9A9A92] leading-relaxed">{tip.desc}</div>
+              <div className="text-xs text-[#6B6B65] leading-relaxed">{tip.desc}</div>
             </div>
           ))}
         </div>

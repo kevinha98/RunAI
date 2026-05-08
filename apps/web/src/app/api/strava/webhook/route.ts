@@ -9,13 +9,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getAthlete, getAthleteStats, getActivity, getActivities } from "@/lib/strava";
-import {
-  readStats,
-  writeStats,
-  computeMetrics,
-  type StoredStats,
-} from "@/lib/stats-store";
+import { getActivityForUser, getAthleteForUser, getAthleteStatsForUser } from "@/lib/strava";
+import { computeMetrics, writeUserStats, readUserStats, type StoredStats } from "@/lib/stats-store";
+import { getUserIdByStravaAthleteId, updateUserStravaStats } from "@/lib/db/user-strava";
 
 // ─── GET — subscription validation ──────────────────────────────────────────
 
@@ -39,7 +35,7 @@ interface StravaWebhookEvent {
   object_type: "activity" | "athlete";
   aspect_type: "create" | "update" | "delete";
   object_id: number;
-  owner_id: number;
+  owner_id: number; // Strava athlete ID
   subscription_id: number;
   event_time: number;
   updates: Record<string, string>;
@@ -47,16 +43,21 @@ interface StravaWebhookEvent {
 
 export async function POST(req: NextRequest) {
   // Respond 200 immediately — Strava requires a response within 2 seconds
-  // We do async work after acknowledging receipt
   const event = (await req.json()) as StravaWebhookEvent;
 
-  console.log(`[strava/webhook] Event: ${event.object_type}.${event.aspect_type} id=${event.object_id}`);
+  console.log(`[strava/webhook] Event: ${event.object_type}.${event.aspect_type} id=${event.object_id} owner=${event.owner_id}`);
+
+  // Look up which RunAI user owns this Strava athlete_id
+  const userId = await getUserIdByStravaAthleteId(event.owner_id);
+  if (!userId) {
+    console.log(`[strava/webhook] No user found for Strava athlete ${event.owner_id} — ignoring`);
+    return new NextResponse(null, { status: 200 });
+  }
 
   // Handle deauthorization
   if (event.object_type === "athlete" && event.updates?.authorized === "false") {
-    console.log("[strava/webhook] Athlete deauthorized — clearing stored stats");
-    const current = readStats();
-    writeStats({ ...current, athlete: null });
+    console.log(`[strava/webhook] Athlete ${event.owner_id} deauthorized`);
+    await updateUserStravaStats(userId, { athlete: undefined });
     revalidatePath("/dashboard");
     return new NextResponse(null, { status: 200 });
   }
@@ -68,12 +69,11 @@ export async function POST(req: NextRequest) {
 
   try {
     if (event.aspect_type === "create" || event.aspect_type === "update") {
-      await syncActivity(event.object_id, event.aspect_type);
+      await syncActivity(userId, event.object_id, event.aspect_type);
     } else if (event.aspect_type === "delete") {
-      await removeActivity(event.object_id);
+      await removeActivity(userId, event.object_id);
     }
   } catch (err) {
-    // Log but don't fail — Strava won't retry 200 responses
     console.error("[strava/webhook] Error processing event:", err);
   }
 
@@ -82,53 +82,44 @@ export async function POST(req: NextRequest) {
 
 // ─── Sync helpers ────────────────────────────────────────────────────────────
 
-async function syncActivity(activityId: number, reason: "create" | "update") {
-  console.log(`[strava/webhook] Syncing activity ${activityId} (${reason})`);
+async function syncActivity(userId: string, activityId: number, reason: "create" | "update") {
+  console.log(`[strava/webhook] Syncing activity ${activityId} for user ${userId} (${reason})`);
 
   const [activity, athlete] = await Promise.all([
-    getActivity(activityId),
-    getAthlete(),
+    getActivityForUser(userId, activityId),
+    getAthleteForUser(userId),
   ]);
 
-  const stats = await getAthleteStats(athlete.id);
-  const current = readStats();
+  const stravaStats = await getAthleteStatsForUser(userId, athlete.id);
+  const current = await readUserStats(userId);
 
-  // Merge this activity into the stored list (deduplicate by id)
   const filtered = current.recentActivities.filter((a) => a.id !== activity.id);
-  const allActivities = [activity, ...filtered].slice(0, 50); // keep last 50
-
-  const runs = allActivities.filter(
-    (a) => a.type === "Run" || a.sport_type === "Run"
-  );
-
-  const computed = computeMetrics(runs, stats);
+  const allActivities = [activity, ...filtered].slice(0, 50);
+  const runs = allActivities.filter((a) => a.type === "Run" || a.sport_type === "Run");
+  const computed = computeMetrics(runs, stravaStats);
 
   const updated: StoredStats = {
     lastSync: new Date().toISOString(),
     athlete,
-    stravaStats: stats,
+    stravaStats,
     recentActivities: allActivities,
     recentRuns: runs.slice(0, 20),
     computed,
   };
 
-  writeStats(updated);
-
-  // Bust Next.js page cache so the dashboard shows fresh data immediately
+  await writeUserStats(userId, updated);
   revalidatePath("/dashboard");
-  console.log(`[strava/webhook] Stats updated. Weekly km: ${computed.weeklyKm}`);
+  console.log(`[strava/webhook] Updated stats for user ${userId}. Weekly km: ${computed.weeklyKm}`);
 }
 
-async function removeActivity(activityId: number) {
-  console.log(`[strava/webhook] Removing activity ${activityId} from store`);
-  const current = readStats();
+async function removeActivity(userId: string, activityId: number) {
+  console.log(`[strava/webhook] Removing activity ${activityId} for user ${userId}`);
+  const current = await readUserStats(userId);
   const allActivities = current.recentActivities.filter((a) => a.id !== activityId);
-  const runs = allActivities.filter(
-    (a) => a.type === "Run" || a.sport_type === "Run"
-  );
+  const runs = allActivities.filter((a) => a.type === "Run" || a.sport_type === "Run");
   const computed = computeMetrics(runs, current.stravaStats);
 
-  writeStats({
+  await writeUserStats(userId, {
     ...current,
     recentActivities: allActivities,
     recentRuns: runs.slice(0, 20),
@@ -138,3 +129,4 @@ async function removeActivity(activityId: number) {
 
   revalidatePath("/dashboard");
 }
+

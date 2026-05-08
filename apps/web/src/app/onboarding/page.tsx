@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -55,9 +55,9 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0D0D0C] text-[#F2F2F0] flex flex-col">
+    <div className="min-h-dvh bg-[#F5F5F3] text-[#111110] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-[#2E2E29]">
+      <div className="flex items-center justify-between px-6 py-5 border-b border-[#E5E5E2]">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 bg-[#FC5200] rounded-lg flex items-center justify-center">
             <span className="text-white font-black text-xs">R</span>
@@ -67,7 +67,7 @@ export default function OnboardingPage() {
         {step > 0 && step < STEPS.length - 1 && (
           <button
             onClick={back}
-            className="flex items-center gap-1.5 text-sm text-[#9A9A92] hover:text-[#F2F2F0] transition-colors"
+            className="flex items-center gap-1.5 text-sm text-[#6B6B65] hover:text-[#111110] transition-colors"
           >
             <ArrowLeft size={14} /> Tilbake
           </button>
@@ -75,7 +75,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* Progress bar */}
-      <div className="h-0.5 bg-[#2E2E29]">
+      <div className="h-0.5 bg-[#E5E5E2]">
         <div
           className="h-full transition-all duration-500"
           style={{ width: `${progress}%`, background: "#FC5200" }}
@@ -87,7 +87,7 @@ export default function OnboardingPage() {
         <div className="w-full max-w-lg">
           <div className="text-center mb-10">
             <h1 className="text-3xl font-black tracking-tight mb-2">{currentStep.title}</h1>
-            <p className="text-[#9A9A92]">{currentStep.subtitle}</p>
+            <p className="text-[#6B6B65]">{currentStep.subtitle}</p>
           </div>
 
           {/* Step: goal */}
@@ -100,11 +100,11 @@ export default function OnboardingPage() {
                   className={`flex flex-col items-start p-5 rounded-2xl border transition-all text-left ${
                     data.goal === g.id
                       ? "border-[#FC5200] bg-[rgba(252,82,0,0.10)]"
-                      : "border-[#2E2E29] bg-[#1A1A17] hover:border-[rgba(252,82,0,0.30)]"
+                      : "border-[#E5E5E2] bg-white hover:border-[rgba(252,82,0,0.30)]"
                   }`}
                 >
                   <span className="font-bold text-lg mb-1">{g.label}</span>
-                  <span className="text-xs text-[#9A9A92] mt-0.5">{g.desc}</span>
+                  <span className="text-xs text-[#6B6B65] mt-0.5">{g.desc}</span>
                 </button>
               ))}
             </div>
@@ -120,12 +120,12 @@ export default function OnboardingPage() {
                   className={`w-full flex items-center justify-between p-5 rounded-2xl border transition-all text-left ${
                     data.level === l.id
                       ? "border-[#FC5200] bg-[rgba(252,82,0,0.10)]"
-                      : "border-[#2E2E29] bg-[#1A1A17] hover:border-[rgba(252,82,0,0.30)]"
+                      : "border-[#E5E5E2] bg-white hover:border-[rgba(252,82,0,0.30)]"
                   }`}
                 >
                   <div>
                     <div className="font-bold">{l.label}</div>
-                    <div className="text-xs text-[#9A9A92] mt-0.5">{l.desc}</div>
+                    <div className="text-xs text-[#6B6B65] mt-0.5">{l.desc}</div>
                   </div>
                   {data.level === l.id && (
                     <CheckCircle size={18} className="text-[#FC5200] shrink-0" />
@@ -145,7 +145,7 @@ export default function OnboardingPage() {
                 <input
                   type="text"
                   placeholder="f.eks. 25:30"
-                  className="w-full bg-[#1A1A17] border border-[#2E2E29] rounded-xl px-4 py-3.5 text-[#F2F2F0] placeholder-[#5A5A54] focus:outline-none focus:border-[#FC5200] transition-colors"
+                  className="w-full bg-white border border-[#E5E5E2] rounded-xl px-4 py-3.5 text-[#111110] placeholder-[#A0A09A] focus:outline-none focus:border-[#FC5200] transition-colors"
                   onChange={(e) => setData((p) => ({ ...p, fiveKTime: e.target.value }))}
                 />
               </div>
@@ -156,7 +156,7 @@ export default function OnboardingPage() {
                 <input
                   type="text"
                   placeholder="f.eks. 30 km/uke"
-                  className="w-full bg-[#1A1A17] border border-[#2E2E29] rounded-xl px-4 py-3.5 text-[#F2F2F0] placeholder-[#5A5A54] focus:outline-none focus:border-[#FC5200] transition-colors"
+                  className="w-full bg-white border border-[#E5E5E2] rounded-xl px-4 py-3.5 text-[#111110] placeholder-[#A0A09A] focus:outline-none focus:border-[#FC5200] transition-colors"
                   onChange={(e) => setData((p) => ({ ...p, weeklyKm: e.target.value }))}
                 />
               </div>
@@ -184,11 +184,11 @@ export default function OnboardingPage() {
                   className={`w-full flex items-center justify-between p-5 rounded-2xl border transition-all ${
                     data.daysPerWeek === String(days)
                       ? "border-[#FC5200] bg-[rgba(252,82,0,0.10)]"
-                      : "border-[#2E2E29] bg-[#1A1A17] hover:border-[rgba(252,82,0,0.30)]"
+                      : "border-[#E5E5E2] bg-white hover:border-[rgba(252,82,0,0.30)]"
                   }`}
                 >
                   <span className="font-bold">{label}</span>
-                  <span className="text-sm text-[#9A9A92]">{detail}</span>
+                  <span className="text-sm text-[#6B6B65]">{detail}</span>
                 </button>
               ))}
             </div>
@@ -203,11 +203,11 @@ export default function OnboardingPage() {
                 </label>
                 <input
                   type="date"
-                  className="w-full bg-[#1A1A17] border border-[#2E2E29] rounded-xl px-4 py-3.5 text-[#F2F2F0] focus:outline-none focus:border-[#FC5200] transition-colors [color-scheme:dark]"
+                  className="w-full bg-white border border-[#E5E5E2] rounded-xl px-4 py-3.5 text-[#111110] focus:outline-none focus:border-[#FC5200] transition-colors [color-scheme:light]"
                   onChange={(e) => setData((p) => ({ ...p, raceDate: e.target.value }))}
                 />
               </div>
-              <p className="text-xs text-[#5A5A54] text-center">
+              <p className="text-xs text-[#6B6B65] text-center">
                 La st\u00e5 blank \u2014 da velger Claude optimal varighet
               </p>
               <button
@@ -297,7 +297,7 @@ function GeneratingStep({
           <div
             key={p}
             className={`flex items-center gap-3 text-sm transition-all duration-500 ${
-              i < phase ? "text-[#FC5200]" : i === phase ? "text-[#F2F2F0]" : "text-[#3A3A35]"
+              i < phase ? "text-[#FC5200]" : i === phase ? "text-[#111110]" : "text-[#C8C8C4]"
             }`}
           >
             <span className="w-5 h-5 rounded-full border flex items-center justify-center text-xs shrink-0 border-current">

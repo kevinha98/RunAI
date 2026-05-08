@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   Brain,
   MessageCircle,
@@ -124,11 +124,11 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
           <h1 className="text-2xl font-black tracking-tight">
             {athleteName ? `God dag, ${athleteName} \ud83d\udc4b` : "God dag \ud83d\udc4b"}
           </h1>
-          <p className="text-[#9A9A92] text-sm mt-1">{daysUntilRace} dager til l\u00f8psdagen</p>
+          <p className="text-[#6B6B65] text-sm mt-1">{daysUntilRace} dager til l\u00f8psdagen</p>
         </div>
         <Link
           href="/dashboard/coach"
-          className="flex items-center gap-2 bg-[#1A1A17] border border-[#2E2E29] hover:border-[rgba(252,82,0,0.40)] px-4 py-2.5 rounded-xl text-sm transition-colors"
+          className="flex items-center gap-2 bg-white border border-[#E5E5E2] hover:border-[rgba(252,82,0,0.40)] px-4 py-2.5 rounded-xl text-sm transition-colors"
         >
           <MessageCircle size={14} className="text-[#FC5200]" />
           Sp\u00f8r treneren din
@@ -142,7 +142,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
             <div>
               <div className="text-xs text-[#FC5200] font-bold uppercase tracking-widest mb-1">I dag</div>
               <h2 className="text-xl font-black tracking-tight mb-1">{today.type}</h2>
-              <p className="text-[#9A9A92] text-sm">
+              <p className="text-[#6B6B65] text-sm">
                 {today.distance} &middot; M\u00e5lfart {today.pace}
               </p>
             </div>
@@ -158,11 +158,11 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
 
       {/* Rest day notice */}
       {today && today.type === "Hvile" && (
-        <div className="border border-[#2E2E29] rounded-2xl p-5 mb-6 flex items-center gap-4 bg-[#1A1A17]">
+        <div className="border border-[#E5E5E2] rounded-2xl p-5 mb-6 flex items-center gap-4 bg-[#F8F8F6]">
           <span className="text-2xl">\ud83d\udece</span>
           <div>
             <div className="text-sm font-semibold">Hviledag i dag</div>
-            <div className="text-xs text-[#9A9A92] mt-0.5">Restitusjon er en del av treningen</div>
+            <div className="text-xs text-[#6B6B65] mt-0.5">Restitusjon er en del av treningen</div>
           </div>
         </div>
       )}
@@ -172,12 +172,12 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
         {metrics.map((m) => (
           <div
             key={m.label}
-            className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-5 hover:border-[#3A3A35] transition-colors"
+            className="bg-white border border-[#E5E5E2] rounded-2xl p-5 hover:border-[#C8C8C4] transition-colors"
           >
-            <div className="text-xs text-[#5A5A54] mb-2 font-medium">{m.label}</div>
+            <div className="text-xs text-[#6B6B65] mb-2 font-medium">{m.label}</div>
             <div className="flex items-end gap-1">
               <span className="text-2xl font-black tracking-tight">{m.value}</span>
-              {m.unit && <span className="text-xs text-[#9A9A92] mb-1">{m.unit}</span>}
+              {m.unit && <span className="text-xs text-[#6B6B65] mb-1">{m.unit}</span>}
             </div>
             <div className={`text-xs mt-1 font-semibold ${m.positive ? "text-[#FC5200]" : "text-[#ef4444]"}`}>
               {m.delta}
@@ -190,7 +190,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
       <div className="grid grid-cols-3 gap-6">
         {/* This week's plan */}
         <div className="col-span-2 space-y-6">
-          <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6">
+          <div className="bg-[#FFFFFF] border border-[#E5E5E2] rounded-2xl p-6">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold">Denne uken</h3>
               <Link
@@ -206,33 +206,33 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
                   key={d.day}
                   className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${
                     d.today
-                      ? "bg-[rgba(252,82,0,0.08)] border border-[rgba(252,82,0,0.18)]"
-                      : "hover:bg-[#222220]"
+                      ? "bg-[rgba(252,82,0,0.07)] border border-[rgba(252,82,0,0.18)]"
+                      : "hover:bg-[#F2F2F0]"
                   }`}
                 >
-                  <span className="text-xs font-bold text-[#5A5A54] w-7">{d.day}</span>
+                  <span className="text-xs font-bold text-[#6B6B65] w-7">{d.day}</span>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span
                         className={`text-sm font-semibold ${
-                          d.done ? "text-[#3A3A35] line-through" : "text-[#F2F2F0]"
+                          d.done ? "text-[#C8C8C4] line-through" : "text-[#111110]"
                         }`}
                       >
                         {d.type}
                       </span>
                       {d.today && (
-                        <span className="text-xs bg-[rgba(252,82,0,0.15)] text-[#FC5200] px-2 py-0.5 rounded-full font-bold">
+                        <span className="text-xs bg-[rgba(252,82,0,0.12)] text-[#FC5200] px-2 py-0.5 rounded-full font-bold">
                           I dag
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-[#5A5A54]">
+                    <span className="text-xs text-[#6B6B65]">
                       {d.distance} &middot; {d.pace}
                     </span>
                   </div>
                   <div
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#3A3A35]"
+                      d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#C8C8C4]"
                     }`}
                   >
                     {d.done && (
@@ -246,7 +246,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
 
           {/* Recent Strava activities */}
           {recentRuns.length > 0 && (
-            <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6">
+            <div className="bg-[#FFFFFF] border border-[#E5E5E2] rounded-2xl p-6">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
                   <StravaIcon />
@@ -263,14 +263,14 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
                 {recentRuns.slice(0, 6).map((run) => (
                   <div
                     key={run.id}
-                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-[#222220] transition-colors"
+                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-[#F2F2F0] transition-colors"
                   >
-                    <span className="text-xs text-[#5A5A54] w-12 shrink-0">
+                    <span className="text-xs text-[#6B6B65] w-12 shrink-0">
                       {formatDate(run.start_date_local)}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold truncate">{run.name}</div>
-                      <div className="text-xs text-[#5A5A54]">
+                      <div className="text-xs text-[#6B6B65]">
                         {metersToKm(run.distance)} km &middot; {activityPace(run)} &middot;{" "}
                         {formatMovingTime(run.moving_time)}
                       </div>
@@ -288,12 +288,12 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
 
           {/* Prompt to connect Strava if no data */}
           {!hasData && (
-            <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6">
+            <div className="bg-[#FFFFFF] border border-[#E5E5E2] rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-3">
                 <StravaIcon />
                 <h3 className="font-bold">Koble Strava for l\u00f8psdata</h3>
               </div>
-              <p className="text-sm text-[#9A9A92] mb-4">
+              <p className="text-sm text-[#6B6B65] mb-4">
                 Koble til Strava for \u00e5 se aktivitetshistorikk, fart og fremgang.
               </p>
               <a
@@ -307,7 +307,7 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
         </div>
 
         {/* AI Coach card */}
-        <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6 flex flex-col">
+        <div className="bg-[#FFFFFF] border border-[#E5E5E2] rounded-2xl p-6 flex flex-col">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 bg-[rgba(252,82,0,0.10)] rounded-xl flex items-center justify-center">
               <Brain size={16} className="text-[#FC5200]" />
@@ -315,11 +315,11 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
             <h3 className="font-bold">AI-trener</h3>
           </div>
           <div className="flex-1 space-y-3 mb-5">
-            <div className="bg-[#222220] rounded-xl p-3.5 text-xs text-[#9A9A92] leading-relaxed">
+            <div className="bg-[#F2F2F0] rounded-xl p-3.5 text-xs text-[#6B6B65] leading-relaxed">
               &ldquo;Flott terskell\u00f8kt mandag! Farten var 4 sekunder raskere enn m\u00e5l.
               Jeg har justert onsdagens \u00f8kt litt opp for \u00e5 opprettholde stimulansen.&rdquo;
             </div>
-            <div className="bg-[#222220] rounded-xl p-3.5 text-xs text-[#9A9A92] leading-relaxed">
+            <div className="bg-[#F2F2F0] rounded-xl p-3.5 text-xs text-[#6B6B65] leading-relaxed">
               &ldquo;Langkj\u00f8ringen l\u00f8rdag er n\u00f8kkel\u00f8kten denne uken. Hold 6:00/km,
               og vi er p\u00e5 vei mot 1:52.&rdquo;
             </div>

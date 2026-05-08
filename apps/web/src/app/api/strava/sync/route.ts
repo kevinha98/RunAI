@@ -1,45 +1,54 @@
 /**
  * POST /api/strava/sync
  *
- * Full sync — fetches the latest 50 activities and athlete stats from Strava
- * and persists them to the local stats store.
+ * Full sync — fetches ALL activities and athlete stats from Strava
+ * and persists them to Supabase for the currently logged-in user.
  *
- * Call this once manually after connecting Strava to seed the stats file.
- * After that, the webhook keeps everything up to date automatically.
+ * Also accepts x-user-id header (internal use from callback route).
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getAthlete, getAthleteStats, getActivities } from "@/lib/strava";
-import { writeStats, computeMetrics, type StoredStats } from "@/lib/stats-store";
+import { getAthleteForUser, getAthleteStatsForUser, getAllActivitiesForUser } from "@/lib/strava";
+import { computeMetrics, writeUserStats, type StoredStats } from "@/lib/stats-store";
+import { createClient } from "@/lib/supabase/server";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  // Allow internal calls (from callback) via header, else use session
+  const headerUserId = req.headers.get("x-user-id");
+  let userId: string;
+
+  if (headerUserId) {
+    userId = headerUserId;
+  } else {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    userId = user.id;
+  }
+
   try {
-    const athlete = await getAthlete();
+    const athlete = await getAthleteForUser(userId);
 
-    // Fetch stats and activities in parallel, but don't let activities failure break everything
     let stravaStats = null;
-    let activities: Awaited<ReturnType<typeof getActivities>> = [];
+    let activities: Awaited<ReturnType<typeof getAllActivitiesForUser>> = [];
     let scopeError: string | null = null;
 
     try {
       [stravaStats, activities] = await Promise.all([
-        getAthleteStats(athlete.id),
-        getActivities({ perPage: 50 }),
+        getAthleteStatsForUser(userId, athlete.id),
+        getAllActivitiesForUser(userId),
       ]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("401") || msg.includes("activity:read_permission")) {
-        // Token doesn't have activity scope — re-auth needed
-        scopeError =
-          "Token is missing activity:read_all scope. Visit /api/strava/connect to re-authorize.";
+        scopeError = "Token is missing activity:read_all scope. Please reconnect Strava.";
         console.warn("[strava/sync]", scopeError);
-        // Still try to get athlete stats with read scope
         try {
-          stravaStats = await getAthleteStats(athlete.id);
-        } catch {
-          // ignore
-        }
+          stravaStats = await getAthleteStatsForUser(userId, athlete.id);
+        } catch { /* ignore */ }
       } else {
         throw err;
       }
@@ -60,7 +69,7 @@ export async function POST() {
       computed,
     };
 
-    writeStats(stats);
+    await writeUserStats(userId, stats);
     revalidatePath("/dashboard");
 
     return NextResponse.json({
@@ -76,3 +85,6 @@ export async function POST() {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+
+

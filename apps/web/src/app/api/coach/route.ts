@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { llm, MODELS } from "@/lib/llm";
-import { readStats } from "@/lib/stats-store";
+import { readUserStats } from "@/lib/stats-store";
 import { formatPace } from "@/lib/strava-types";
+import { createClient } from "@/lib/supabase/server";
+import type { StoredStats } from "@/lib/strava-types";
 
-function buildSystemPrompt(): string {
-  const stats = readStats();
+function buildSystemPrompt(stats: StoredStats): string {
   const { athlete, computed, recentRuns } = stats;
 
   const athleteCtx = athlete
@@ -59,6 +60,11 @@ ${recentCtx}
 
 export async function POST(req: NextRequest) {
   try {
+    // Get logged-in user for their personal Strava data
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const stats = user ? await readUserStats(user.id) : { athlete: null, computed: { weeklyKm: 0, weeklyRuns: 0, avgPaceSecPerKm: 0, longestRunKm: 0, totalRunsAllTime: 0, totalKmAllTime: 0, ytdKm: 0 }, recentRuns: [], recentActivities: [], stravaStats: null, lastSync: "" };
+
     const body = await req.json();
     const { messages } = body as {
       messages: { role: "user" | "assistant"; content: string }[];
@@ -68,17 +74,15 @@ export async function POST(req: NextRequest) {
       return new Response("Invalid request body", { status: 400 });
     }
 
-    // Filter to valid Anthropic message format (skip initial assistant greeting)
     const anthropicMessages = messages.filter((m) => m.content.trim().length > 0);
 
     const stream = llm.messages.stream({
       model: MODELS.SONNET,
       max_tokens: 1024,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt(stats),
       messages: anthropicMessages,
     });
 
-    // Stream response in SSE format
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {
@@ -114,3 +118,4 @@ export async function POST(req: NextRequest) {
     return new Response("Internal server error", { status: 500 });
   }
 }
+
