@@ -12,18 +12,18 @@ type Message = {
 };
 
 const SUGGESTED_QUESTIONS = [
-  "Why am I doing a threshold run today?",
-  "I'm feeling tired — should I skip the long run?",
-  "How do I run my best half marathon?",
-  "My knee hurts. What should I do?",
-  "Can you adjust my plan — I missed this week?",
+  "Hvorfor gjør jeg en terskeløkt i dag?",
+  "Jeg er sliten — bør jeg hoppe over langkjøringen?",
+  "Hvordan løper jeg mitt beste halvmaraton?",
+  "Kneet mitt gjør vondt. Hva bør jeg gjøre?",
+  "Kan du justere planen — jeg gikk glipp av denne uken?",
 ];
 
 const INITIAL_MESSAGE: Message = {
   id: "0",
   role: "assistant",
   content:
-    "Hey! I'm your AI running coach. I know your full training history, current plan, and performance data. Ask me anything — why you're doing certain sessions, how to handle injuries, how to race, or let me adjust your plan around life events. What's on your mind?",
+    "Hei! Jeg er AI-treneren din. Jeg kjenner din fulle treningshistorikk, nåværende plan og ytelsesdata. Still meg hva som helst — hvorfor du gjør bestemte økter, hvordan du håndterer skader, hvordan du løper et best mulig løp, eller la meg tilpasse planen rundt livets hendelser. Hva tenker du på?",
   timestamp: new Date(),
 };
 
@@ -103,7 +103,7 @@ export default function CoachPage() {
                 );
               }
             } catch {
-              // skip malformed chunks
+              // hopp over ødelagte biter
             }
           }
         }
@@ -114,7 +114,7 @@ export default function CoachPage() {
         {
           id: (Date.now() + 2).toString(),
           role: "assistant",
-          content: "Sorry, I couldn't connect right now. Check your API key in .env.local.",
+          content: "Beklager, kunne ikke koble til akkurat nå. Sjekk API-nøkkelen i .env.local.",
           timestamp: new Date(),
         },
       ]);
@@ -125,19 +125,19 @@ export default function CoachPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
+    <div className="min-h-screen bg-[#0D0D0C] text-[#F2F2F0] flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-[#1f1f1f] bg-[#0d0d0d]">
-        <Link href="/dashboard" className="text-[#71717a] hover:text-white transition-colors">
+      <div className="flex items-center gap-4 px-6 py-4 border-b border-[#2E2E29] bg-[#111110]">
+        <Link href="/dashboard" className="text-[#9A9A92] hover:text-[#F2F2F0] transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-[#22c55e]/10 rounded-xl flex items-center justify-center">
-            <Brain size={18} className="text-[#22c55e]" />
+          <div className="w-9 h-9 bg-[rgba(252,82,0,0.10)] rounded-xl flex items-center justify-center">
+            <Brain size={18} className="text-[#FC5200]" />
           </div>
           <div>
-            <div className="font-semibold text-sm">AI Coach</div>
-            <div className="text-xs text-[#22c55e]">● Online · Powered by Claude</div>
+            <div className="font-bold text-sm">AI-trener</div>
+            <div className="text-xs text-[#FC5200] font-semibold">● Online · Drevet av Claude</div>
           </div>
         </div>
       </div>
@@ -151,21 +151,21 @@ export default function CoachPage() {
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {message.role === "assistant" && (
-                <div className="w-7 h-7 bg-[#22c55e]/10 rounded-lg flex items-center justify-center mr-3 mt-1 flex-shrink-0">
-                  <Brain size={14} className="text-[#22c55e]" />
+                <div className="w-7 h-7 bg-[rgba(252,82,0,0.10)] rounded-lg flex items-center justify-center mr-3 mt-1 shrink-0">
+                  <Brain size={14} className="text-[#FC5200]" />
                 </div>
               )}
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                className={`max-w-[80%] rounded-2xl px-4 py-3.5 text-sm leading-relaxed ${
                   message.role === "user"
-                    ? "bg-[#22c55e] text-black font-medium"
-                    : "bg-[#141414] border border-[#1f1f1f] text-[#e4e4e7]"
+                    ? "bg-[#FC5200] text-white font-medium"
+                    : "bg-[#1A1A17] border border-[#2E2E29] text-[#F2F2F0]"
                 }`}
               >
                 {message.content || (
-                  <span className="flex items-center gap-2 text-[#71717a]">
+                  <span className="flex items-center gap-2 text-[#9A9A92]">
                     <Loader2 size={14} className="animate-spin" />
-                    Thinking...
+                    Tenker...
                   </span>
                 )}
               </div>
@@ -183,7 +183,7 @@ export default function CoachPage() {
               <button
                 key={q}
                 onClick={() => sendMessage(q)}
-                className="text-xs bg-[#141414] border border-[#1f1f1f] hover:border-[#22c55e]/40 px-3 py-2 rounded-xl text-[#a1a1aa] hover:text-white transition-colors"
+                className="text-xs bg-[#1A1A17] border border-[#2E2E29] hover:border-[rgba(252,82,0,0.40)] px-3.5 py-2 rounded-xl text-[#9A9A92] hover:text-[#F2F2F0] transition-colors"
               >
                 {q}
               </button>
@@ -193,7 +193,7 @@ export default function CoachPage() {
       )}
 
       {/* Input */}
-      <div className="px-4 py-4 border-t border-[#1f1f1f] bg-[#0d0d0d]">
+      <div className="px-4 py-4 border-t border-[#2E2E29] bg-[#111110]">
         <div className="max-w-3xl mx-auto flex gap-3">
           <input
             ref={inputRef}
@@ -201,14 +201,14 @@ export default function CoachPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage(input)}
-            placeholder="Ask your coach anything..."
+            placeholder="Spør treneren din om hva som helst..."
             disabled={loading}
-            className="flex-1 bg-[#141414] border border-[#1f1f1f] rounded-xl px-4 py-3 text-sm text-white placeholder-[#52525b] focus:outline-none focus:border-[#22c55e] transition-colors disabled:opacity-50"
+            className="flex-1 bg-[#1A1A17] border border-[#2E2E29] rounded-xl px-4 py-3 text-sm text-[#F2F2F0] placeholder-[#5A5A54] focus:outline-none focus:border-[#FC5200] transition-colors disabled:opacity-50"
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || loading}
-            className="bg-[#22c55e] text-black w-11 h-11 rounded-xl flex items-center justify-center hover:bg-[#16a34a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+            className="bg-[#FC5200] text-white w-11 h-11 rounded-xl flex items-center justify-center hover:bg-[#E04800] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>

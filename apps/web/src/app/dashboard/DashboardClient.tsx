@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import {
@@ -15,30 +15,31 @@ import {
 import type { StoredStats } from "@/lib/strava-types";
 import { formatPace } from "@/lib/strava-types";
 
-const STRAVA_ORANGE = "#FC4C02";
+const STRAVA_ORANGE = "#FC5200";
+const P = "#FC5200";
 
-// Training plan — stays AI-managed; will be replaced by generated plan from /api/generate-plan
+// Treningsplan â€” administreres av AI; erstattes av generert plan fra /api/generate-plan
 const MOCK_PLAN = {
   raceDate: "2026-08-22",
   thisWeek: [
-    { day: "Mon", type: "Easy Run", distance: "8 km", pace: "5:45/km", done: true },
-    { day: "Tue", type: "Strength", distance: "45 min", pace: "Runner's circuits", done: true },
-    { day: "Wed", type: "Threshold", distance: "10 km", pace: "4:50/km", done: false, today: true },
-    { day: "Thu", type: "Rest", distance: "—", pace: "Recovery", done: false },
-    { day: "Fri", type: "Easy Run", distance: "6 km", pace: "5:50/km", done: false },
-    { day: "Sat", type: "Long Run", distance: "18 km", pace: "6:00/km", done: false },
-    { day: "Sun", type: "Rest", distance: "—", pace: "Recovery", done: false },
+    { day: "Man", type: "Lett lÃ¸ping", distance: "8 km", pace: "5:45/km", done: true },
+    { day: "Tir", type: "Styrke", distance: "45 min", pace: "LÃ¸peÃ¸velser", done: true },
+    { day: "Ons", type: "TerskelÃ¸kt", distance: "10 km", pace: "4:50/km", done: false, today: true },
+    { day: "Tor", type: "Hvile", distance: "â€”", pace: "Restitusjon", done: false },
+    { day: "Fre", type: "Lett lÃ¸ping", distance: "6 km", pace: "5:50/km", done: false },
+    { day: "LÃ¸r", type: "LangkjÃ¸ring", distance: "18 km", pace: "6:00/km", done: false },
+    { day: "SÃ¸n", type: "Hvile", distance: "â€”", pace: "Restitusjon", done: false },
   ],
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function metersToKm(m: number) {
   return (m / 1000).toFixed(1);
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", {
+  return new Date(iso).toLocaleDateString("nb-NO", {
     day: "numeric",
     month: "short",
   });
@@ -47,17 +48,17 @@ function formatDate(iso: string) {
 function formatMovingTime(secs: number) {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}t ${m}m`;
   return `${m}m`;
 }
 
 function activityPace(activity: { distance: number; moving_time: number }) {
-  if (!activity.distance || !activity.moving_time) return "—";
+  if (!activity.distance || !activity.moving_time) return "â€”";
   const secPerKm = activity.moving_time / (activity.distance / 1000);
-  return formatPace(secPerKm) + "/km";
+  return formatPace(secPerKm);
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface Props {
   stravaData: StoredStats;
@@ -73,123 +74,91 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
   const { computed, athlete, recentRuns, lastSync } = stravaData;
   const hasData = athlete !== null;
   const isStravaLinked = hasData || stravaStatus === "connected";
-
   const athleteName = athlete ? athlete.firstname : "Kevin";
 
-  // Build live metrics (real data if synced, fallback labels otherwise)
   const metrics = hasData
     ? [
-        {
-          label: "Weekly km",
-          value: computed.weeklyKm.toFixed(1),
-          unit: "km",
-          delta: `${computed.weeklyRuns} run${computed.weeklyRuns !== 1 ? "s" : ""}`,
-          positive: true,
-        },
-        {
-          label: "Avg pace",
-          value: formatPace(computed.avgPaceSecPerKm),
-          unit: "/km",
-          delta: "Last 5 runs",
-          positive: true,
-        },
-        {
-          label: "YTD km",
-          value: computed.ytdKm.toFixed(0),
-          unit: "km",
-          delta: `${computed.totalRunsAllTime} runs all-time`,
-          positive: true,
-        },
-        {
-          label: "Longest (30d)",
-          value: computed.longestRunKm.toFixed(1),
-          unit: "km",
-          delta: "Last 30 days",
-          positive: true,
-        },
+        { label: "Ukentlig km", value: computed.weeklyKm.toFixed(1), unit: "km", delta: `${computed.weeklyRuns} Ã¸kt${computed.weeklyRuns !== 1 ? "er" : ""}`, positive: true },
+        { label: "Snittfart", value: formatPace(computed.avgPaceSecPerKm), unit: "/km", delta: "Siste 5 lÃ¸p", positive: true },
+        { label: "Hittil i Ã¥r", value: computed.ytdKm.toFixed(0), unit: "km", delta: `${computed.totalRunsAllTime} lÃ¸p totalt`, positive: true },
+        { label: "Lengste (30d)", value: computed.longestRunKm.toFixed(1), unit: "km", delta: "Siste 30 dager", positive: true },
       ]
     : [
-        { label: "Weekly km", value: "—", unit: "km", delta: "Sync Strava", positive: true },
-        { label: "Avg pace", value: "—", unit: "/km", delta: "Sync Strava", positive: true },
-        { label: "YTD km", value: "—", unit: "km", delta: "Sync Strava", positive: true },
-        { label: "Longest (30d)", value: "—", unit: "km", delta: "Sync Strava", positive: true },
+        { label: "Ukentlig km", value: "â€”", unit: "km", delta: "Koble Strava", positive: true },
+        { label: "Snittfart", value: "â€”", unit: "/km", delta: "Koble Strava", positive: true },
+        { label: "Hittil i Ã¥r", value: "â€”", unit: "km", delta: "Koble Strava", positive: true },
+        { label: "Lengste (30d)", value: "â€”", unit: "km", delta: "Koble Strava", positive: true },
       ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div className="min-h-screen bg-[#0D0D0C] text-[#F2F2F0]">
       {/* Sidebar */}
-      <div className="fixed left-0 top-0 bottom-0 w-60 border-r border-[#1f1f1f] bg-[#0d0d0d] flex flex-col p-5 z-40">
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-7 h-7 bg-[#22c55e] rounded-lg flex items-center justify-center">
-            <span className="text-black font-bold text-xs">R</span>
+      <div className="fixed left-0 top-0 bottom-0 w-60 border-r border-[#2E2E29] bg-[#111110] flex flex-col p-5 z-40">
+        <div className="flex items-center gap-2.5 mb-8">
+          <div className="w-7 h-7 bg-[#FC5200] rounded-lg flex items-center justify-center">
+            <span className="text-white font-black text-xs">R</span>
           </div>
-          <span className="font-semibold">RunAI</span>
+          <span className="font-bold">RunAI</span>
         </div>
 
-        <nav className="space-y-1 flex-1">
+        <nav className="space-y-0.5 flex-1">
           {[
-            { icon: Activity, label: "Dashboard", href: "/dashboard", active: true },
-            { icon: Calendar, label: "Training Plan", href: "/dashboard/plan" },
-            { icon: Brain, label: "AI Coach", href: "/dashboard/coach" },
-            { icon: TrendingUp, label: "Progress", href: "/dashboard/progress" },
-            { icon: Zap, label: "Strength", href: "/dashboard/strength" },
+            { icon: Activity, label: "Oversikt", href: "/dashboard", active: true },
+            { icon: Calendar, label: "Treningsplan", href: "/dashboard/plan" },
+            { icon: Brain, label: "AI-trener", href: "/dashboard/coach" },
+            { icon: TrendingUp, label: "Fremgang", href: "/dashboard/progress" },
+            { icon: Zap, label: "Styrke", href: "/dashboard/strength" },
           ].map(({ icon: Icon, label, href, active }) => (
             <Link
               key={label}
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
                 active
-                  ? "bg-[#22c55e]/10 text-[#22c55e]"
-                  : "text-[#71717a] hover:text-white hover:bg-[#141414]"
+                  ? "bg-[rgba(252,82,0,0.12)] text-[#FC5200] font-medium"
+                  : "text-[#9A9A92] hover:text-[#F2F2F0] hover:bg-[#1A1A17]"
               }`}
             >
-              <Icon size={16} />
+              <Icon size={15} />
               {label}
             </Link>
           ))}
         </nav>
 
-        <div className="border-t border-[#1f1f1f] pt-4">
-          {/* Strava status */}
+        <div className="border-t border-[#2E2E29] pt-4">
           {isStravaLinked ? (
-            <div className="px-3 py-2 mb-3 rounded-xl bg-[#FC4C02]/10 border border-[#FC4C02]/20">
+            <div className="px-3 py-2.5 mb-3 rounded-xl bg-[rgba(252,82,0,0.08)] border border-[rgba(252,82,0,0.20)]">
               <div className="flex items-center gap-2 mb-1">
                 <StravaIcon />
-                <span className="text-xs text-[#FC4C02] font-medium">Strava connected</span>
+                <span className="text-xs text-[#FC5200] font-semibold">Strava tilkoblet</span>
               </div>
               {lastSync && (
-                <div className="text-[10px] text-[#52525b] pl-6">
-                  Synced {new Date(lastSync).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                <div className="text-[10px] text-[#5A5A54] pl-6">
+                  Synkronisert {new Date(lastSync).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
                 </div>
               )}
               <form action="/api/strava/sync" method="POST" className="mt-1.5 pl-6">
-                <button
-                  type="submit"
-                  className="flex items-center gap-1 text-[10px] text-[#52525b] hover:text-[#FC4C02] transition-colors"
-                >
-                  <RefreshCw size={9} /> Sync now
+                <button type="submit" className="flex items-center gap-1 text-[10px] text-[#5A5A54] hover:text-[#FC5200] transition-colors">
+                  <RefreshCw size={9} /> Synkroniser nÃ¥
                 </button>
               </form>
             </div>
           ) : (
             <a
               href="/api/strava/connect"
-              className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl border border-[#FC4C02]/30 hover:bg-[#FC4C02]/10 transition-colors group"
+              className="flex items-center gap-2 px-3 py-2.5 mb-3 rounded-xl border border-[rgba(252,82,0,0.30)] hover:bg-[rgba(252,82,0,0.08)] transition-colors group"
             >
               <StravaIcon />
-              <span className="text-xs text-[#FC4C02] font-medium group-hover:underline">
-                Connect Strava
-              </span>
+              <span className="text-xs text-[#FC5200] font-semibold group-hover:underline">Koble til Strava</span>
             </a>
           )}
 
           <div className="flex items-center gap-3 px-3">
-            <div className="w-8 h-8 bg-[#22c55e] rounded-full flex items-center justify-center text-black font-bold text-sm">
+            <div className="w-8 h-8 bg-[#FC5200] rounded-full flex items-center justify-center text-white font-bold text-sm">
               {athleteName[0]?.toUpperCase() ?? "K"}
             </div>
             <div>
-              <div className="text-sm font-medium">{athleteName}</div>
-              <div className="text-xs text-[#52525b]">Pro plan</div>
+              <div className="text-sm font-semibold">{athleteName}</div>
+              <div className="text-xs text-[#5A5A54]">Pro-plan</div>
             </div>
           </div>
         </div>
@@ -200,94 +169,91 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
         {/* Top bar */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold">
-              Good morning, {athleteName} 👋
+            <h1 className="text-2xl font-black tracking-tight">
+              God dag, {athleteName} ðŸ‘‹
             </h1>
-            <p className="text-[#71717a] text-sm mt-1">{daysUntilRace} days until race day</p>
+            <p className="text-[#9A9A92] text-sm mt-1">{daysUntilRace} dager til lÃ¸psdagen</p>
           </div>
           <Link
             href="/dashboard/coach"
-            className="flex items-center gap-2 bg-[#141414] border border-[#1f1f1f] hover:border-[#22c55e]/40 px-4 py-2.5 rounded-xl text-sm transition-colors"
+            className="flex items-center gap-2 bg-[#1A1A17] border border-[#2E2E29] hover:border-[rgba(252,82,0,0.40)] px-4 py-2.5 rounded-xl text-sm transition-colors"
           >
-            <MessageCircle size={14} className="text-[#22c55e]" />
-            Ask your coach
+            <MessageCircle size={14} className="text-[#FC5200]" />
+            SpÃ¸r treneren din
           </Link>
         </div>
 
         {/* Today's workout */}
         {today && (
-          <div className="bg-gradient-to-br from-[#22c55e]/10 to-[#16a34a]/5 border border-[#22c55e]/20 rounded-2xl p-6 mb-6">
+          <div className="bg-gradient-to-br from-[rgba(252,82,0,0.10)] to-[rgba(252,82,0,0.04)] border border-[rgba(252,82,0,0.20)] rounded-2xl p-6 mb-6">
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-xs text-[#22c55e] font-medium uppercase tracking-wider mb-1">Today</div>
-                <h2 className="text-xl font-bold mb-1">{today.type}</h2>
-                <p className="text-[#a1a1aa] text-sm">
-                  {today.distance} · Target pace {today.pace}
+                <div className="text-xs text-[#FC5200] font-bold uppercase tracking-widest mb-1">I dag</div>
+                <h2 className="text-xl font-black tracking-tight mb-1">{today.type}</h2>
+                <p className="text-[#9A9A92] text-sm">
+                  {today.distance} Â· MÃ¥lfart {today.pace}
                 </p>
               </div>
-              <button className="flex items-center gap-2 bg-[#22c55e] text-black px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-[#16a34a] transition-colors">
+              <button className="flex items-center gap-2 bg-[#FC5200] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-[#E04800] transition-colors">
                 <Play size={14} /> Start
               </button>
             </div>
           </div>
         )}
 
-        {/* Live metrics from Strava */}
+        {/* Live metrics */}
         <div className="grid grid-cols-4 gap-4 mb-6">
           {metrics.map((m) => (
-            <div key={m.label} className="bg-[#141414] border border-[#1f1f1f] rounded-2xl p-5">
-              <div className="text-xs text-[#52525b] mb-2">{m.label}</div>
+            <div key={m.label} className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-5 hover:border-[#3A3A35] transition-colors">
+              <div className="text-xs text-[#5A5A54] mb-2 font-medium">{m.label}</div>
               <div className="flex items-end gap-1">
-                <span className="text-2xl font-bold">{m.value}</span>
-                {m.unit && <span className="text-xs text-[#71717a] mb-1">{m.unit}</span>}
+                <span className="text-2xl font-black tracking-tight">{m.value}</span>
+                {m.unit && <span className="text-xs text-[#9A9A92] mb-1">{m.unit}</span>}
               </div>
-              <div className={`text-xs mt-1 ${m.positive ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
+              <div className={`text-xs mt-1 font-semibold ${m.positive ? "text-[#FC5200]" : "text-[#ef4444]"}`}>
                 {m.delta}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Plan + activities */}
+        {/* Plan + activities + coach */}
         <div className="grid grid-cols-3 gap-6">
           {/* This week's plan */}
           <div className="col-span-2 space-y-6">
-            <div className="bg-[#141414] border border-[#1f1f1f] rounded-2xl p-6">
+            <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="font-semibold">This Week</h3>
-                <Link
-                  href="/dashboard/plan"
-                  className="text-xs text-[#22c55e] flex items-center gap-1 hover:underline"
-                >
+                <h3 className="font-bold">Denne uken</h3>
+                <Link href="/dashboard/plan" className="text-xs text-[#FC5200] flex items-center gap-1 hover:underline font-semibold">
                   Full plan <ChevronRight size={12} />
                 </Link>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {MOCK_PLAN.thisWeek.map((d) => (
                   <div
                     key={d.day}
                     className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${
                       d.today
-                        ? "bg-[#22c55e]/10 border border-[#22c55e]/20"
-                        : "hover:bg-[#1c1c1c]"
+                        ? "bg-[rgba(252,82,0,0.08)] border border-[rgba(252,82,0,0.18)]"
+                        : "hover:bg-[#222220]"
                     }`}
                   >
-                    <span className="text-xs font-medium text-[#52525b] w-7">{d.day}</span>
+                    <span className="text-xs font-bold text-[#5A5A54] w-7">{d.day}</span>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className={`text-sm font-medium ${d.done ? "text-[#3f3f46] line-through" : "text-white"}`}>
+                        <span className={`text-sm font-semibold ${d.done ? "text-[#3A3A35] line-through" : "text-[#F2F2F0]"}`}>
                           {d.type}
                         </span>
                         {d.today && (
-                          <span className="text-xs bg-[#22c55e]/20 text-[#22c55e] px-2 py-0.5 rounded-full">
-                            Today
+                          <span className="text-xs bg-[rgba(252,82,0,0.15)] text-[#FC5200] px-2 py-0.5 rounded-full font-bold">
+                            I dag
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-[#52525b]">{d.distance} · {d.pace}</span>
+                      <span className="text-xs text-[#5A5A54]">{d.distance} Â· {d.pace}</span>
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${d.done ? "bg-[#22c55e] border-[#22c55e]" : "border-[#3f3f46]"}`}>
-                      {d.done && <span className="text-black text-xs">✓</span>}
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#3A3A35]"}`}>
+                      {d.done && <span className="text-white text-xs font-bold">âœ“</span>}
                     </div>
                   </div>
                 ))}
@@ -296,32 +262,32 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
 
             {/* Recent Strava activities */}
             {recentRuns.length > 0 && (
-              <div className="bg-[#141414] border border-[#1f1f1f] rounded-2xl p-6">
+              <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
                     <StravaIcon />
-                    <h3 className="font-semibold">Recent Runs</h3>
+                    <h3 className="font-bold">Siste lÃ¸p</h3>
                   </div>
-                  <span className="text-xs text-[#52525b]">from Strava</span>
+                  <span className="text-xs text-[#5A5A54]">fra Strava</span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {recentRuns.slice(0, 6).map((run) => (
                     <div
                       key={run.id}
-                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-[#1c1c1c] transition-colors"
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-[#222220] transition-colors"
                     >
-                      <span className="text-xs text-[#52525b] w-12 shrink-0">
+                      <span className="text-xs text-[#5A5A54] w-12 shrink-0">
                         {formatDate(run.start_date_local)}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{run.name}</div>
-                        <div className="text-xs text-[#52525b]">
-                          {metersToKm(run.distance)} km · {activityPace(run)} · {formatMovingTime(run.moving_time)}
+                        <div className="text-sm font-semibold truncate">{run.name}</div>
+                        <div className="text-xs text-[#5A5A54]">
+                          {metersToKm(run.distance)} km Â· {activityPace(run)} Â· {formatMovingTime(run.moving_time)}
                         </div>
                       </div>
                       {run.average_heartrate && (
-                        <span className="text-xs text-[#ef4444] shrink-0">
-                          ♥ {Math.round(run.average_heartrate)}
+                        <span className="text-xs text-[#ef4444] shrink-0 font-semibold">
+                          â™¥ {Math.round(run.average_heartrate)}
                         </span>
                       )}
                     </div>
@@ -332,27 +298,27 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
           </div>
 
           {/* AI Coach card */}
-          <div className="bg-[#141414] border border-[#1f1f1f] rounded-2xl p-6 flex flex-col">
+          <div className="bg-[#1A1A17] border border-[#2E2E29] rounded-2xl p-6 flex flex-col">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-[#22c55e]/10 rounded-xl flex items-center justify-center">
-                <Brain size={16} className="text-[#22c55e]" />
+              <div className="w-8 h-8 bg-[rgba(252,82,0,0.10)] rounded-xl flex items-center justify-center">
+                <Brain size={16} className="text-[#FC5200]" />
               </div>
-              <h3 className="font-semibold">AI Coach</h3>
+              <h3 className="font-bold">AI-trener</h3>
             </div>
-            <div className="flex-1 space-y-3 mb-4">
-              <div className="bg-[#1c1c1c] rounded-xl p-3 text-xs text-[#a1a1aa] leading-relaxed">
-                "Great threshold session Monday! Your pace was 4 seconds faster than target. I've nudged Wednesday's threshold up slightly to keep the stimulus."
+            <div className="flex-1 space-y-3 mb-5">
+              <div className="bg-[#222220] rounded-xl p-3.5 text-xs text-[#9A9A92] leading-relaxed">
+                &ldquo;Flott terskelÃ¸kt mandag! Farten var 4 sekunder raskere enn mÃ¥l. Jeg har justert onsdagens Ã¸kt litt opp for Ã¥ opprettholde stimulansen.&rdquo;
               </div>
-              <div className="bg-[#1c1c1c] rounded-xl p-3 text-xs text-[#a1a1aa] leading-relaxed">
-                "Your long run on Saturday is the key session this week. Hit 6:00/km and we're on track for 1:52."
+              <div className="bg-[#222220] rounded-xl p-3.5 text-xs text-[#9A9A92] leading-relaxed">
+                &ldquo;LangkjÃ¸ringen lÃ¸rdag er nÃ¸kkelÃ¸kten denne uken. Hold 6:00/km, og vi er pÃ¥ vei mot 1:52.&rdquo;
               </div>
             </div>
             <Link
               href="/dashboard/coach"
-              className="flex items-center justify-center gap-2 w-full border border-[#22c55e]/30 text-[#22c55e] py-2.5 rounded-xl text-sm font-medium hover:bg-[#22c55e]/10 transition-colors"
+              className="flex items-center justify-center gap-2 w-full border border-[rgba(252,82,0,0.30)] text-[#FC5200] py-3 rounded-xl text-sm font-bold hover:bg-[rgba(252,82,0,0.08)] transition-colors"
             >
               <MessageCircle size={14} />
-              Chat with coach
+              Chat med treneren
             </Link>
           </div>
         </div>
@@ -368,3 +334,4 @@ function StravaIcon() {
     </svg>
   );
 }
+

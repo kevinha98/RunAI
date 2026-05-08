@@ -1,30 +1,29 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Noto_Sans } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
+const notoSans = Noto_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "RunAI — AI Running Coach",
+    default: "RunAI — AI Løpecoach",
     template: "%s | RunAI",
   },
   description:
-    "Claude-powered adaptive running plans that evolve with every run. Your personal AI coach that actually learns.",
-  keywords: ["running", "AI coach", "training plan", "marathon", "5k", "10k"],
+    "Claude-drevet adaptiv løpecoach som lager et personlig treningsprogram og omskriver det ukentlig basert på hvordan du faktisk løper.",
+  keywords: ["løping", "AI-coach", "treningsprogram", "maraton", "halvmaraton", "5k", "10k", "løpeplan"],
   openGraph: {
-    title: "RunAI — AI Running Coach",
-    description: "Claude-powered adaptive running plans that evolve with every run.",
+    title: "RunAI — AI Løpecoach",
+    description: "Personlig treningsprogram som tilpasser seg deg — hver uke.",
     type: "website",
+    locale: "nb_NO",
   },
+  themeColor: "#0D0D0C",
 };
 
 export default function RootLayout({
@@ -33,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="no" className="dark">
+      <body className={`${notoSans.variable} antialiased`}>
         {children}
       </body>
     </html>
