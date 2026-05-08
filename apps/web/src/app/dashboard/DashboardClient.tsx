@@ -74,7 +74,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
   const { computed, athlete, recentRuns, lastSync } = stravaData;
   const hasData = athlete !== null;
   const isStravaLinked = hasData || stravaStatus === "connected";
-  const athleteName = athlete ? athlete.firstname : "Kevin";
+  const athleteName = athlete?.firstname ?? null;
 
   const metrics = hasData
     ? [
@@ -154,10 +154,10 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
 
           <div className="flex items-center gap-3 px-3">
             <div className="w-8 h-8 bg-[#FC5200] rounded-full flex items-center justify-center text-white font-bold text-sm">
-              {athleteName[0]?.toUpperCase() ?? "K"}
+              {athleteName ? athleteName[0].toUpperCase() : "?"}
             </div>
             <div>
-              <div className="text-sm font-semibold">{athleteName}</div>
+              <div className="text-sm font-semibold">{athleteName ?? "Ikke tilkoblet"}</div>
               <div className="text-xs text-[#5A5A54]">Pro-plan</div>
             </div>
           </div>
@@ -170,7 +170,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
-              God dag, {athleteName} 👋
+              {athleteName ? `God dag, ${athleteName} 👋` : "God dag 👋"}
             </h1>
             <p className="text-[#9A9A92] text-sm mt-1">{daysUntilRace} dager til løpsdagen</p>
           </div>
