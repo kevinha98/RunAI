@@ -1,0 +1,189 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── User Profile ────────────────────────────────────────────────────────────
+
+enum UserLevel {
+  beginner
+  intermediate
+  advanced
+  elite
+}
+
+enum GoalDistance {
+  five_k
+  ten_k
+  half_marathon
+  marathon
+  ultra
+  custom
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  name             String
+  level            UserLevel @default(beginner)
+  goal             GoalDistance
+  fiveKTimeSec     Int?      // personal best 5K in seconds
+  weeklyKmBaseline Float?    // current weekly km at signup
+  daysPerWeek      Int       @default(4)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  plans         TrainingPlan[]
+  activities    Activity[]
+  conversations CoachConversation[]
+
+  @@map("users")
+}
+
+// ─── Training Plan ───────────────────────────────────────────────────────────
+
+enum TrainingPhase {
+  Base
+  Build
+  Peak
+  Taper
+}
+
+enum SessionType {
+  EasyRun
+  Threshold
+  Interval
+  LongRun
+  Recovery
+  Strength
+  Mobility
+  Rest
+}
+
+model TrainingPlan {
+  id                  String    @id @default(cuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planName            String
+  goal                GoalDistance
+  totalWeeks          Int
+  currentWeek         Int       @default(1)
+  raceDate            DateTime
+  predictedTime       String?
+  coachingNotes       String    @db.Text
+  generatedAt         DateTime  @default(now())
+  lastRegeneratedAt   DateTime?
+  isActive            Boolean   @default(true)
+  generationInputJson Json?     // stores raw input for regeneration
+
+  weeks TrainingWeek[]
+
+  @@map("training_plans")
+}
+
+model TrainingWeek {
+  id       String        @id @default(cuid())
+  planId   String
+  plan     TrainingPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  week     Int
+  phase    TrainingPhase
+  focus    String
+  totalKm  Float
+  startDate DateTime
+  endDate   DateTime
+
+  sessions TrainingSession[]
+
+  @@map("training_weeks")
+}
+
+model TrainingSession {
+  id              String      @id @default(cuid())
+  weekId          String
+  week            TrainingWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  day             String      // "Monday", "Tuesday", etc.
+  type            SessionType
+  distance        String?
+  targetPace      String?
+  description     String      @db.Text
+  completed       Boolean     @default(false)
+  completedAt     DateTime?
+
+  // Post-run data (linked from Activity or entered manually)
+  actualDistanceKm Float?
+  actualPaceSec    Int?       // seconds per km
+  heartRateAvg     Int?
+  perceivedEffort  Int?       // 1-10
+  notes            String?    @db.Text
+
+  activity Activity?
+
+  @@map("training_sessions")
+}
+
+// ─── Activities (from watch/Strava/HealthKit) ────────────────────────────────
+
+enum ActivitySource {
+  manual
+  healthkit
+  health_connect
+  strava
+  garmin
+}
+
+model Activity {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId     String?        @unique
+  session       TrainingSession? @relation(fields: [sessionId], references: [id])
+  type          String         // "run", "strength", etc.
+  distanceKm    Float?
+  durationSec   Int
+  avgPaceSec    Int?           // seconds per km
+  avgHeartRate  Int?
+  maxHeartRate  Int?
+  elevationGain Float?
+  cadenceAvg    Int?
+  source        ActivitySource @default(manual)
+  externalId    String?        @unique
+  recordedAt    DateTime
+  createdAt     DateTime       @default(now())
+
+  @@index([userId, recordedAt])
+  @@map("activities")
+}
+
+// ─── AI Coach Conversations ──────────────────────────────────────────────────
+
+model CoachConversation {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  messages CoachMessage[]
+
+  @@map("coach_conversations")
+}
+
+model CoachMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  conversation   CoachConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String            // "user" | "assistant"
+  content        String            @db.Text
+  timestamp      DateTime          @default(now())
+
+  @@index([conversationId, timestamp])
+  @@map("coach_messages")
+}

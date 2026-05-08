@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "RunAI",
+    "slug": "runai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.runai.app",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "RunAI uses HealthKit to track your runs and sync training data.",
+        "NSHealthUpdateUsageDescription": "RunAI writes workout data to HealthKit."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "package": "com.runai.app",
+      "permissions": ["android.permission.health.READ_DISTANCE", "android.permission.health.READ_EXERCISE", "android.permission.health.WRITE_EXERCISE"]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "scheme": "runai",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
