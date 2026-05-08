@@ -10,12 +10,15 @@ import {
   MessageCircle,
   ChevronRight,
   Play,
+  RefreshCw,
 } from "lucide-react";
+import type { StoredStats } from "@/lib/strava-types";
+import { formatPace } from "@/lib/strava-types";
 
-// Mock data — replace with real Supabase queries
+const STRAVA_ORANGE = "#FC4C02";
+
+// Training plan — stays AI-managed; will be replaced by generated plan from /api/generate-plan
 const MOCK_PLAN = {
-  name: "Half Marathon — 16 Week Block",
-  weeksRemaining: 11,
   raceDate: "2026-08-22",
   thisWeek: [
     { day: "Mon", type: "Easy Run", distance: "8 km", pace: "5:45/km", done: true },
@@ -28,18 +31,89 @@ const MOCK_PLAN = {
   ],
 };
 
-const METRICS = [
-  { label: "Weekly km", value: "47", unit: "km", delta: "+12%", positive: true },
-  { label: "Avg pace", value: "5:21", unit: "/km", delta: "-8s", positive: true },
-  { label: "Predicted HM", value: "1:52", unit: "", delta: "-4 min", positive: true },
-  { label: "Load score", value: "68", unit: "/100", delta: "Optimal", positive: true },
-];
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export default function DashboardClient() {
+function metersToKm(m: number) {
+  return (m / 1000).toFixed(1);
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function formatMovingTime(secs: number) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function activityPace(activity: { distance: number; moving_time: number }) {
+  if (!activity.distance || !activity.moving_time) return "—";
+  const secPerKm = activity.moving_time / (activity.distance / 1000);
+  return formatPace(secPerKm) + "/km";
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+interface Props {
+  stravaData: StoredStats;
+  stravaStatus?: string | null;
+}
+
+export default function DashboardClient({ stravaData, stravaStatus }: Props) {
   const today = MOCK_PLAN.thisWeek.find((d) => d.today);
   const daysUntilRace = Math.ceil(
     (new Date(MOCK_PLAN.raceDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   );
+
+  const { computed, athlete, recentRuns, lastSync } = stravaData;
+  const hasData = athlete !== null;
+  const isStravaLinked = hasData || stravaStatus === "connected";
+
+  const athleteName = athlete ? athlete.firstname : "Kevin";
+
+  // Build live metrics (real data if synced, fallback labels otherwise)
+  const metrics = hasData
+    ? [
+        {
+          label: "Weekly km",
+          value: computed.weeklyKm.toFixed(1),
+          unit: "km",
+          delta: `${computed.weeklyRuns} run${computed.weeklyRuns !== 1 ? "s" : ""}`,
+          positive: true,
+        },
+        {
+          label: "Avg pace",
+          value: formatPace(computed.avgPaceSecPerKm),
+          unit: "/km",
+          delta: "Last 5 runs",
+          positive: true,
+        },
+        {
+          label: "YTD km",
+          value: computed.ytdKm.toFixed(0),
+          unit: "km",
+          delta: `${computed.totalRunsAllTime} runs all-time`,
+          positive: true,
+        },
+        {
+          label: "Longest (30d)",
+          value: computed.longestRunKm.toFixed(1),
+          unit: "km",
+          delta: "Last 30 days",
+          positive: true,
+        },
+      ]
+    : [
+        { label: "Weekly km", value: "—", unit: "km", delta: "Sync Strava", positive: true },
+        { label: "Avg pace", value: "—", unit: "/km", delta: "Sync Strava", positive: true },
+        { label: "YTD km", value: "—", unit: "km", delta: "Sync Strava", positive: true },
+        { label: "Longest (30d)", value: "—", unit: "km", delta: "Sync Strava", positive: true },
+      ];
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
@@ -76,12 +150,45 @@ export default function DashboardClient() {
         </nav>
 
         <div className="border-t border-[#1f1f1f] pt-4">
+          {/* Strava status */}
+          {isStravaLinked ? (
+            <div className="px-3 py-2 mb-3 rounded-xl bg-[#FC4C02]/10 border border-[#FC4C02]/20">
+              <div className="flex items-center gap-2 mb-1">
+                <StravaIcon />
+                <span className="text-xs text-[#FC4C02] font-medium">Strava connected</span>
+              </div>
+              {lastSync && (
+                <div className="text-[10px] text-[#52525b] pl-6">
+                  Synced {new Date(lastSync).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              )}
+              <form action="/api/strava/sync" method="POST" className="mt-1.5 pl-6">
+                <button
+                  type="submit"
+                  className="flex items-center gap-1 text-[10px] text-[#52525b] hover:text-[#FC4C02] transition-colors"
+                >
+                  <RefreshCw size={9} /> Sync now
+                </button>
+              </form>
+            </div>
+          ) : (
+            <a
+              href="/api/strava/connect"
+              className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl border border-[#FC4C02]/30 hover:bg-[#FC4C02]/10 transition-colors group"
+            >
+              <StravaIcon />
+              <span className="text-xs text-[#FC4C02] font-medium group-hover:underline">
+                Connect Strava
+              </span>
+            </a>
+          )}
+
           <div className="flex items-center gap-3 px-3">
             <div className="w-8 h-8 bg-[#22c55e] rounded-full flex items-center justify-center text-black font-bold text-sm">
-              K
+              {athleteName[0]?.toUpperCase() ?? "K"}
             </div>
             <div>
-              <div className="text-sm font-medium">Kevin</div>
+              <div className="text-sm font-medium">{athleteName}</div>
               <div className="text-xs text-[#52525b]">Pro plan</div>
             </div>
           </div>
@@ -93,7 +200,9 @@ export default function DashboardClient() {
         {/* Top bar */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold">Good morning, Kevin 👋</h1>
+            <h1 className="text-2xl font-bold">
+              Good morning, {athleteName} 👋
+            </h1>
             <p className="text-[#71717a] text-sm mt-1">{daysUntilRace} days until race day</p>
           </div>
           <Link
@@ -123,14 +232,14 @@ export default function DashboardClient() {
           </div>
         )}
 
-        {/* Metrics grid */}
+        {/* Live metrics from Strava */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          {METRICS.map((m) => (
+          {metrics.map((m) => (
             <div key={m.label} className="bg-[#141414] border border-[#1f1f1f] rounded-2xl p-5">
               <div className="text-xs text-[#52525b] mb-2">{m.label}</div>
               <div className="flex items-end gap-1">
                 <span className="text-2xl font-bold">{m.value}</span>
-                <span className="text-xs text-[#71717a] mb-1">{m.unit}</span>
+                {m.unit && <span className="text-xs text-[#71717a] mb-1">{m.unit}</span>}
               </div>
               <div className={`text-xs mt-1 ${m.positive ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
                 {m.delta}
@@ -139,48 +248,87 @@ export default function DashboardClient() {
           ))}
         </div>
 
-        {/* This week's plan */}
+        {/* Plan + activities */}
         <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 bg-[#141414] border border-[#1f1f1f] rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-semibold">This Week</h3>
-              <Link
-                href="/dashboard/plan"
-                className="text-xs text-[#22c55e] flex items-center gap-1 hover:underline"
-              >
-                Full plan <ChevronRight size={12} />
-              </Link>
-            </div>
-            <div className="space-y-2">
-              {MOCK_PLAN.thisWeek.map((d) => (
-                <div
-                  key={d.day}
-                  className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${
-                    d.today
-                      ? "bg-[#22c55e]/10 border border-[#22c55e]/20"
-                      : "hover:bg-[#1c1c1c]"
-                  }`}
+          {/* This week's plan */}
+          <div className="col-span-2 space-y-6">
+            <div className="bg-[#141414] border border-[#1f1f1f] rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-semibold">This Week</h3>
+                <Link
+                  href="/dashboard/plan"
+                  className="text-xs text-[#22c55e] flex items-center gap-1 hover:underline"
                 >
-                  <span className="text-xs font-medium text-[#52525b] w-7">{d.day}</span>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-medium ${d.done ? "text-[#3f3f46] line-through" : "text-white"}`}>
-                        {d.type}
+                  Full plan <ChevronRight size={12} />
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {MOCK_PLAN.thisWeek.map((d) => (
+                  <div
+                    key={d.day}
+                    className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${
+                      d.today
+                        ? "bg-[#22c55e]/10 border border-[#22c55e]/20"
+                        : "hover:bg-[#1c1c1c]"
+                    }`}
+                  >
+                    <span className="text-xs font-medium text-[#52525b] w-7">{d.day}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-medium ${d.done ? "text-[#3f3f46] line-through" : "text-white"}`}>
+                          {d.type}
+                        </span>
+                        {d.today && (
+                          <span className="text-xs bg-[#22c55e]/20 text-[#22c55e] px-2 py-0.5 rounded-full">
+                            Today
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-[#52525b]">{d.distance} · {d.pace}</span>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${d.done ? "bg-[#22c55e] border-[#22c55e]" : "border-[#3f3f46]"}`}>
+                      {d.done && <span className="text-black text-xs">✓</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recent Strava activities */}
+            {recentRuns.length > 0 && (
+              <div className="bg-[#141414] border border-[#1f1f1f] rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2">
+                    <StravaIcon />
+                    <h3 className="font-semibold">Recent Runs</h3>
+                  </div>
+                  <span className="text-xs text-[#52525b]">from Strava</span>
+                </div>
+                <div className="space-y-2">
+                  {recentRuns.slice(0, 6).map((run) => (
+                    <div
+                      key={run.id}
+                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-[#1c1c1c] transition-colors"
+                    >
+                      <span className="text-xs text-[#52525b] w-12 shrink-0">
+                        {formatDate(run.start_date_local)}
                       </span>
-                      {d.today && (
-                        <span className="text-xs bg-[#22c55e]/20 text-[#22c55e] px-2 py-0.5 rounded-full">
-                          Today
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{run.name}</div>
+                        <div className="text-xs text-[#52525b]">
+                          {metersToKm(run.distance)} km · {activityPace(run)} · {formatMovingTime(run.moving_time)}
+                        </div>
+                      </div>
+                      {run.average_heartrate && (
+                        <span className="text-xs text-[#ef4444] shrink-0">
+                          ♥ {Math.round(run.average_heartrate)}
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-[#52525b]">{d.distance} · {d.pace}</span>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${d.done ? "bg-[#22c55e] border-[#22c55e]" : "border-[#3f3f46]"}`}>
-                    {d.done && <span className="text-black text-xs">✓</span>}
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* AI Coach card */}
@@ -210,5 +358,13 @@ export default function DashboardClient() {
         </div>
       </div>
     </div>
+  );
+}
+
+function StravaIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0" fill={STRAVA_ORANGE}>
+      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+    </svg>
   );
 }
