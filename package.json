@@ -1,19 +1,9 @@
 {
   "name": "runai",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "turbo run dev",
-    "dev:web": "turbo run dev --filter=@runai/web",
-    "dev:mobile": "turbo run dev --filter=@runai/mobile",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "type-check": "turbo run type-check",
-    "db:generate": "turbo run db:generate",
-    "db:push": "turbo run db:push"
+    "dev": "cd apps/web && npm run dev",
+    "build": "cd apps/web && npm run build"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

@@ -1,12 +1,17 @@
-import { redirect } from "next/navigation";
 import DashboardClient from "./DashboardClient";
+import { readStats } from "@/lib/stats-store";
 
-// Server component — auth check will go here
-export default function DashboardPage() {
-  // TODO: replace with real Supabase auth check
-  // const supabase = createClient();
-  // const { data: { user } } = await supabase.auth.getUser();
-  // if (!user) redirect("/login");
+export const dynamic = "force-dynamic";
 
-  return <DashboardClient />;
+interface PageProps {
+  searchParams: Promise<{ strava?: string }>;
 }
+
+export default async function DashboardPage({ searchParams }: PageProps) {
+  const stats = readStats();
+  const params = await searchParams;
+  return <DashboardClient stravaData={stats} stravaStatus={params.strava ?? null} />;
+}
+
+
+
