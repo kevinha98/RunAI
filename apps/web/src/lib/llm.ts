@@ -15,7 +15,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 
-const GATEWAY_BASE_URL = "https://gateway.raicode.no/v1";
+const GATEWAY_BASE_URL = "https://gateway.raicode.no";
 
 function createGatewayClient(): Anthropic {
   const apiKey =
