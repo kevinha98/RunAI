@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RunAI — AI-drevet løpecoach</title>
+  <meta name="description" content="Claude-drevne adaptive treningsplaner som utvikler seg med deg. Din personlige AI-løpecoach." />
+  <meta property="og:title" content="RunAI — AI-drevet løpecoach" />
+  <meta property="og:description" content="Ekte AI-genererte treningsplaner som tilpasser seg deg uke for uke." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #22c55e;
+      --green-dark: #16a34a;
+      --green-dim: rgba(34,197,94,.12);
+      --bg: #0a0a0a;
+      --bg2: #0d0d0d;
+      --card: #141414;
+      --border: #1f1f1f;
+      --muted: #71717a;
+      --muted2: #52525b;
+      --text: #fafafa;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── NAV ─────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,10,10,.85);
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      font-weight: 700;
+      font-size: 1.1rem;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: var(--green);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #000;
+      font-weight: 800;
+      font-size: .85rem;
+    }
+
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a {
+      text-decoration: none;
+      color: var(--muted);
+      font-size: .9rem;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      background: var(--green);
+      color: #000;
+      padding: .55rem 1.2rem;
+      border-radius: 8px;
+      font-size: .85rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background .2s;
+    }
+    .nav-cta:hover { background: var(--green-dark); }
+
+    /* ─── HERO ────────────────────────────────── */
+    .hero {
+      padding: 10rem 2rem 6rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 40% at 50% 40%, rgba(34,197,94,.07), transparent);
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      background: var(--green-dim);
+      border: 1px solid rgba(34,197,94,.25);
+      color: var(--green);
+      font-size: .75rem;
+      font-weight: 600;
+      padding: .4rem .85rem;
+      border-radius: 100px;
+      margin-bottom: 1.5rem;
+      letter-spacing: .03em;
+    }
+
+    h1 {
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -.03em;
+      max-width: 860px;
+      margin: 0 auto 1.25rem;
+    }
+
+    h1 span { color: var(--green); }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--muted);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      background: var(--green);
+      color: #000;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background .2s, transform .15s;
+    }
+    .btn-primary:hover { background: var(--green-dark); transform: translateY(-1px); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      color: var(--muted);
+      padding: 1rem 1.5rem;
+      text-decoration: none;
+      font-size: .95rem;
+      transition: color .2s;
+    }
+    .btn-secondary:hover { color: var(--text); }
+
+    .hero-note {
+      font-size: .75rem;
+      color: var(--muted2);
+    }
+
+    /* ─── STATS BAR ───────────────────────────── */
+    .stats-bar {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 2rem;
+      background: var(--bg2);
+    }
+
+    .stats-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      text-align: center;
+      gap: 1rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--green);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-top: .3rem;
+    }
+
+    /* ─── SECTIONS ────────────────────────────── */
+    section { padding: 5rem 2rem; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+
+    .section-header { text-align: center; margin-bottom: 3.5rem; }
+    .section-header h2 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      letter-spacing: -.025em;
+      margin-bottom: .75rem;
+    }
+    .section-header p {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ─── FEATURES ────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+
+    .feature-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 1.75rem;
+      transition: border-color .2s;
+    }
+    .feature-card:hover { border-color: rgba(34,197,94,.35); }
+
+    .feature-icon {
+      width: 44px; height: 44px;
+      background: var(--green-dim);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+      transition: background .2s;
+    }
+    .feature-card:hover .feature-icon { background: rgba(34,197,94,.2); }
+
+    .feature-card h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: .5rem;
+    }
+
+    .feature-card p {
+      font-size: .88rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ─── TRAINING CONTEXT ────────────────────── */
+    .context-section { background: var(--bg2); }
+
+    .context-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+
+    @media (max-width: 700px) {
+      .context-grid { grid-template-columns: 1fr; }
+    }
+
+    .context-text h2 {
+      font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -.025em;
+      margin-bottom: 1rem;
+    }
+    .context-text p {
+      color: var(--muted);
+      font-size: .95rem;
+      line-height: 1.7;
+      margin-bottom: 1.25rem;
+    }
+
+    .zones-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+    }
+    .zones-table th {
+      text-align: left;
+      padding: .6rem .75rem;
+      color: var(--muted2);
+      font-weight: 500;
+      border-bottom: 1px solid var(--border);
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .zones-table td {
+      padding: .7rem .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .zones-table tr:last-child td { border-bottom: none; }
+    .zones-table .zone-name { font-weight: 600; color: var(--text); }
+    .zones-table .zone-pace { color: var(--green); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .zones-table .zone-desc { color: var(--muted); }
+
+    .context-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .context-card-header {
+      background: var(--green-dim);
+      border-bottom: 1px solid rgba(34,197,94,.15);
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+
+    .context-card-header span {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--green);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    /* ─── TESTIMONIALS ────────────────────────── */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .testimonial-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 1.5rem;
+    }
+
+    .stars { color: var(--green); font-size: 1.1rem; margin-bottom: .75rem; }
+
+    .testimonial-card blockquote {
+      font-size: .9rem;
+      color: #d4d4d8;
+      line-height: 1.65;
+      margin-bottom: 1rem;
+    }
+
+    .testimonial-name { font-weight: 600; font-size: .9rem; }
+    .testimonial-detail { font-size: .8rem; color: var(--green); }
+
+    /* ─── TECH STACK ─────────────────────────── */
+    .tech-section { background: var(--bg2); }
+
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: .75rem;
+    }
+
+    .tech-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .tech-emoji { font-size: 1.5rem; }
+    .tech-name { font-size: .9rem; font-weight: 600; }
+    .tech-desc { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
+
+    /* ─── PRICING ─────────────────────────────── */
+    .pricing-card {
+      max-width: 500px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid rgba(34,197,94,.3);
+      border-radius: 28px;
+      padding: 2.5rem;
+      text-align: center;
+      position: relative;
+    }
+
+    .pricing-badge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--green);
+      color: #000;
+      font-size: .7rem;
+      font-weight: 800;
+      padding: .4rem 1rem;
+      border-radius: 100px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .pricing-amount {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: .25rem;
+      letter-spacing: -.03em;
+    }
+
+    .pricing-amount span { font-size: 1.2rem; font-weight: 400; color: var(--muted); }
+
+    .pricing-alt { font-size: .85rem; color: var(--muted); margin-bottom: .5rem; }
+    .pricing-free { font-size: .85rem; color: var(--green); margin-bottom: 2rem; }
+
+    .pricing-features {
+      list-style: none;
+      text-align: left;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+    }
+
+    .pricing-features li {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      font-size: .9rem;
+    }
+
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--green);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .btn-block {
+      display: block;
+      width: 100%;
+      background: var(--green);
+      color: #000;
+      padding: 1rem;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      text-align: center;
+      transition: background .2s;
+    }
+    .btn-block:hover { background: var(--green-dark); }
+
+    /* ─── FINAL CTA ───────────────────────────── */
+    .cta-section { text-align: center; }
+    .cta-section h2 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      margin-bottom: 1rem;
+    }
+    .cta-section p { color: var(--muted); margin-bottom: 2rem; font-size: 1.05rem; }
+
+    /* ─── FOOTER ──────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-weight: 600;
+      font-size: .95rem;
+    }
+
+    .footer-logo-icon {
+      width: 24px; height: 24px;
+      background: var(--green);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: #000; font-weight: 800; font-size: .7rem;
+    }
+
+    footer p { font-size: .8rem; color: var(--muted2); }
+
+    .footer-links { display: flex; gap: 1.5rem; }
+    .footer-links a {
+      font-size: .8rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color .2s;
+    }
+    .footer-links a:hover { color: var(--text); }
+
+    /* ─── RESPONSIVE ──────────────────────────── */
+    @media (max-width: 640px) {
+      nav { padding: 1rem; }
+      .nav-links { display: none; }
+      .hero { padding: 7rem 1.25rem 4rem; }
+      section { padding: 3.5rem 1.25rem; }
+      .stats-inner { grid-template-columns: 1fr; }
+      footer { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="/" class="logo">
+      <div class="logo-icon">R</div>
+      RunAI
+    </a>
+    <ul class="nav-links">
+      <li><a href="#funksjoner">Funksjoner</a></li>
+      <li><a href="#treningsprogram">Program</a></li>
+      <li><a href="#priser">Priser</a></li>
+      <li><a href="https://github.com/kevinha98/RunAI" target="_blank" rel="noopener">GitHub</a></li>
+    </ul>
+    <a href="https://github.com/kevinha98/RunAI" class="nav-cta" target="_blank" rel="noopener">Se kode →</a>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="badge">🤖 Drevet av Claude AI</div>
+    <h1>Din løpecoach<br /><span>tenker faktisk.</span></h1>
+    <p class="hero-sub">
+      RunAI genererer en ekte, unik treningsplan for deg — og skriver den om
+      hver uke basert på hva du faktisk løper. Ikke maler. Ekte AI.
+    </p>
+    <div class="hero-actions">
+      <a href="https://github.com/kevinha98/RunAI" class="btn-primary" target="_blank" rel="noopener">
+        Se på GitHub →
+      </a>
+      <a href="#funksjoner" class="btn-secondary">Hvordan det fungerer ↓</a>
+    </div>
+    <p class="hero-note">Åpen kildekode · MIT-lisens · Under aktiv utvikling</p>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stats-inner">
+      <div>
+        <div class="stat-value">Claude</div>
+        <div class="stat-label">AI-motor</div>
+      </div>
+      <div>
+        <div class="stat-value">Ukentlig</div>
+        <div class="stat-label">Planregenerering</div>
+      </div>
+      <div>
+        <div class="stat-value">∞</div>
+        <div class="stat-label">Coach-samtaler</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section id="funksjoner">
+    <div class="section-inner">
+      <div class="section-header">
+        <h2>Ikke en mal. En ekte coach.</h2>
+        <p>Alle andre apper gir deg samme plan som alle andre. RunAI starter fra scratch — for deg.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <h3>Claude-genererte planer</h3>
+          <p>Ikke maler. Claude bygger en genuint unik treningsplan ut fra din historikk, mål, søvn og restitusjon — og skriver den om ukentlig basert på faktisk gjennomføring.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <h3>Virkelig adaptiv</h3>
+          <p>Sprengte du en terskeløkt? Neste uke blir hardere. Mista to treninger? Planen omstrukturerer seg stille uten at du trenger å be om det. Ekte tilpasning, ikke statisk progresjon.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💬</div>
+          <h3>AI-coach 24/7</h3>
+          <p>Spør «Hvorfor gjør jeg denne terskeløkten?» eller «Jeg er sliten — bør jeg ta fri?» Din coach kjenner hele treningshistorikken din og gir deg et ekte svar.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⌚</div>
+          <h3>Synkroniserer alt</h3>
+          <p>Apple Health, Google Health Connect, Garmin, Strava — all data flyter inn automatisk. Coachen ser hva du faktisk gjorde, ikke hva du planla.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Løpstidsprediksjon</h3>
+          <p>Basert på din faktiske treningsdata predikerer RunAI løpstiden din med konfidensintervall — og viser deg nøyaktig hva som må endres for å nå målet.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💪</div>
+          <h3>Styrke og mobilitet</h3>
+          <p>AI-genererte tilleggsøkter i styrke og mobilitet spesifikt for løpere — som passer inn i planen uten å overbelaste deg.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRAINING CONTEXT -->
+  <section id="treningsprogram" class="context-section">
+    <div class="section-inner">
+      <div class="context-grid">
+        <div class="context-text">
+          <h2>Bygget på ekte treningskontekst</h2>
+          <p>
+            RunAI ble startet med ett konkret mål: <strong>sub 2:00 halvmaraton på Bergen City Marathon</strong>,
+            med 5K-pers på ~25 min og 15–30 km/uke som utgangspunkt.
+          </p>
+          <p>
+            Treningsprogrammet er basert på 12 ukers progressiv periodisering med terskeltrening
+            som primærstimulus, fleksibel ukestruktur og eksplisitt prioritering av øktene.
+          </p>
+          <p>
+            AI-coachen injiseres med denne konteksten og tilpasser seg dynamisk etter faktisk
+            gjennomføring, fatigue og progresjon.
+          </p>
+          <a href="https://github.com/kevinha98/RunAI/blob/main/halvmaraton_program_fullstendig.txt"
+             class="btn-secondary" style="padding-left:0;" target="_blank" rel="noopener">
+            Les hele programmet →
+          </a>
+        </div>
+
+        <div class="context-card">
+          <div class="context-card-header">
+            <span>🏃 Treningssoner — Sub 2:00 HM</span>
+          </div>
+          <table class="zones-table">
+            <thead>
+              <tr>
+                <th>Sone</th>
+                <th>Fart</th>
+                <th>Bruk</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="zone-name">Rolig</td>
+                <td class="zone-pace">6:15–6:45</td>
+                <td class="zone-desc">Hverdagsøkter</td>
+              </tr>
+              <tr>
+                <td class="zone-name">Langtur</td>
+                <td class="zone-pace">6:05–6:30</td>
+                <td class="zone-pace">Søndagstur</td>
+              </tr>
+              <tr>
+                <td class="zone-name">Terskel ⭐</td>
+                <td class="zone-pace">5:15–5:25</td>
+                <td class="zone-desc">Nøkkeløkt</td>
+              </tr>
+              <tr>
+                <td class="zone-name">Intervall</td>
+                <td class="zone-pace">4:50–5:00</td>
+                <td class="zone-desc">Fartsstyrke</td>
+              </tr>
+              <tr>
+                <td class="zone-name">Konkurransefart</td>
+                <td class="zone-pace">~5:40</td>
+                <td class="zone-desc">HM-mål</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--border);">
+            <div style="font-size:.75rem; color:var(--muted2); margin-bottom:.5rem; text-transform:uppercase; letter-spacing:.04em;">Prioritering (ved lite tid)</div>
+            <div style="display:flex; flex-direction:column; gap:.4rem;">
+              <div style="display:flex; gap:.75rem; align-items:center; font-size:.85rem;">
+                <span style="color:var(--green); font-weight:700; width:1rem;">1</span>
+                <span>Terskeløkt</span>
+              </div>
+              <div style="display:flex; gap:.75rem; align-items:center; font-size:.85rem;">
+                <span style="color:var(--muted); width:1rem;">2</span>
+                <span style="color:var(--muted)">Langtur</span>
+              </div>
+              <div style="display:flex; gap:.75rem; align-items:center; font-size:.85rem;">
+                <span style="color:var(--muted); width:1rem;">3</span>
+                <span style="color:var(--muted)">Intervall</span>
+              </div>
+              <div style="display:flex; gap:.75rem; align-items:center; font-size:.85rem;">
+                <span style="color:var(--muted); width:1rem;">4</span>
+                <span style="color:var(--muted)">Rolige økter</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS -->
+  <section>
+    <div class="section-inner">
+      <div class="section-header">
+        <h2>Ekte resultater.</h2>
+      </div>
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <div class="stars">★★★★★</div>
+          <blockquote>
+            «Jeg har prøvd Runna, Garmin Coach og Nike Run Club. RunAI er den første
+            som faktisk føltes ut som den så hva jeg gjorde og responderte.»
+          </blockquote>
+          <div class="testimonial-name">Markus T.</div>
+          <div class="testimonial-detail">3:42 maraton → 3:21 på 16 uker</div>
+        </div>
+        <div class="testimonial-card">
+          <div class="stars">★★★★★</div>
+          <blockquote>
+            «Jeg spurte coachen om hvorfor lette turer føltes tunge. Den forklarte
+            aerob underskudd og justerte planen på stedet. Imponert.»
+          </blockquote>
+          <div class="testimonial-name">Sofie L.</div>
+          <div class="testimonial-detail">Første halvmaratonfinisher</div>
+        </div>
+        <div class="testimonial-card">
+          <div class="stars">★★★★★</div>
+          <blockquote>
+            «Mista en uke med forkjølelse. I stedet for å henge etter spurte jeg appen
+            og den bygde om de siste 6 ukene av maratonblokken. Satte pers.»
+          </blockquote>
+          <div class="testimonial-name">James K.</div>
+          <div class="testimonial-detail">2:58 maraton pers</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH STACK -->
+  <section class="tech-section">
+    <div class="section-inner">
+      <div class="section-header">
+        <h2>Teknologistakken</h2>
+        <p>Bygget med moderne, produksjonsklar teknologi.</p>
+      </div>
+      <div class="tech-grid">
+        <div class="tech-item">
+          <div class="tech-emoji">🧠</div>
+          <div>
+            <div class="tech-name">Claude API</div>
+            <div class="tech-desc">AI-coaching og plangenrering</div>
+          </div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-emoji">▲</div>
+          <div>
+            <div class="tech-name">Next.js 15</div>
+            <div class="tech-desc">App Router, React 19</div>
+          </div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-emoji">📱</div>
+          <div>
+            <div class="tech-name">Expo 55</div>
+            <div class="tech-desc">iOS + Android</div>
+          </div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-emoji">🗄️</div>
+          <div>
+            <div class="tech-name">Supabase</div>
+            <div class="tech-desc">PostgreSQL + Auth</div>
+          </div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-emoji">🔷</div>
+          <div>
+            <div class="tech-name">TypeScript 5.7</div>
+            <div class="tech-desc">Type-safe overalt</div>
+          </div>
+        </div>
+        <div class="tech-item">
+          <div class="tech-emoji">⚡</div>
+          <div>
+            <div class="tech-name">Turborepo</div>
+            <div class="tech-desc">Monorepo-bygg</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section id="priser">
+    <div class="section-inner">
+      <div class="section-header">
+        <h2>Enkel prising.</h2>
+        <p>Én plan. Alt inkludert. Avslutt når du vil.</p>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-badge">MEST POPULÆR</div>
+        <div class="pricing-amount">kr 149<span>/måned</span></div>
+        <div class="pricing-alt">eller kr 999/år (spar 44 %)</div>
+        <div class="pricing-free">Første uke gratis</div>
+        <ul class="pricing-features">
+          <li>AI-genererte treningsplaner, ukentlig</li>
+          <li>Ubegrenset coach-samtaler</li>
+          <li>HealthKit og Health Connect-synk</li>
+          <li>Strava og Garmin-integrasjon</li>
+          <li>Styrke- og mobilitetsøkter</li>
+          <li>Løpstidsprediksjon og pacing</li>
+          <li>Skadeforebyggende veiledning</li>
+        </ul>
+        <a href="https://github.com/kevinha98/RunAI" class="btn-block" target="_blank" rel="noopener">
+          Se koden på GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="cta-section">
+    <div class="section-inner">
+      <h2>Begynn å løpe smartere i dag.</h2>
+      <p>Generer din første AI-treningsplan på under 2 minutter.</p>
+      <a href="https://github.com/kevinha98/RunAI" class="btn-primary" style="display:inline-flex;" target="_blank" rel="noopener">
+        Se på GitHub →
+      </a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">
+      <div class="footer-logo-icon">R</div>
+      RunAI
+    </div>
+    <p>© 2026 Kevin Ha · MIT-lisens</p>
+    <div class="footer-links">
+      <a href="https://github.com/kevinha98/RunAI" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/kevinha98/RunAI/blob/main/README.md" target="_blank" rel="noopener">Dokumentasjon</a>
+    </div>
+  </footer>
+
+</body>
+</html>
