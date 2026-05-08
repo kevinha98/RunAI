@@ -1,6 +1,7 @@
 {
-  "buildCommand": "npx turbo build --filter=@runai/web",
+  "buildCommand": "cd apps/web && npm run build",
   "outputDirectory": "apps/web/.next",
-  "installCommand": "npm install --legacy-peer-deps",
+  "installCommand": "cd apps/web && npm install --legacy-peer-deps",
   "framework": "nextjs"
 }
+
