@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -11,28 +11,28 @@ type Step = {
 };
 
 const STEPS: Step[] = [
-  { id: "goal", title: "Hva er mÃ¥let ditt?", subtitle: "Fortell oss hva du trener mot" },
-  { id: "level", title: "LÃ¸psnivÃ¥?", subtitle: "VÃ¦r Ã¦rlig â€” dette former alt" },
-  { id: "current", title: "Hvor er du nÃ¥?", subtitle: "Nylig ytelse hjelper kalibrere planen din" },
+  { id: "goal", title: "Hva er målet ditt?", subtitle: "Fortell oss hva du trener mot" },
+  { id: "level", title: "Løpsnivå?", subtitle: "Vær ærlig — dette former alt" },
+  { id: "current", title: "Hvor er du nå?", subtitle: "Nylig ytelse hjelper kalibrere planen din" },
   { id: "schedule", title: "Hvor mange dager?", subtitle: "Vi tilpasser planen etter livet ditt" },
-  { id: "timeline", title: "NÃ¥r er lÃ¸psdagen?", subtitle: "Velg en dato eller la AI velge optimal varighet" },
+  { id: "timeline", title: "Når er løpsdagen?", subtitle: "Velg en dato eller la AI velge optimal varighet" },
   { id: "generating", title: "Genererer planen din...", subtitle: "Claude bygger noe bare for deg" },
 ];
 
 const GOALS = [
-  { id: "5k", label: "5K", desc: "LÃ¸p eller forbedre 5K" },
-  { id: "10k", label: "10K", desc: "Tren for et 10K-lÃ¸p" },
+  { id: "5k", label: "5K", desc: "Løp eller forbedre 5K" },
+  { id: "10k", label: "10K", desc: "Tren for et 10K-løp" },
   { id: "half", label: "Halvmaraton", desc: "Mestre 21 kilometer" },
-  { id: "marathon", label: "Maraton", desc: "GÃ¥ hele distansen" },
+  { id: "marathon", label: "Maraton", desc: "Gå hele distansen" },
   { id: "ultra", label: "Ultra", desc: "Utover maraton" },
   { id: "custom", label: "Egendefinert", desc: "Hvilken som helst distanse" },
 ];
 
 const LEVELS = [
-  { id: "beginner", label: "Nybegynner", desc: "LÃ¸per mindre enn 6 mÃ¥neder, eller starter igjen" },
-  { id: "intermediate", label: "Middels", desc: "LÃ¸per jevnlig i 1â€“2+ Ã¥r" },
-  { id: "advanced", label: "Avansert", desc: "Konkurransedyktig, flere lÃ¸p bak seg" },
-  { id: "elite", label: "Elite", desc: "Sub-elite eller klar for Ã¥ konkurrere i toppen" },
+  { id: "beginner", label: "Nybegynner", desc: "Løper mindre enn 6 måneder, eller starter igjen" },
+  { id: "intermediate", label: "Middels", desc: "Løper jevnlig i 1–2+ år" },
+  { id: "advanced", label: "Avansert", desc: "Konkurransedyktig, flere løp bak seg" },
+  { id: "elite", label: "Elite", desc: "Sub-elite eller klar for å konkurrere i toppen" },
 ];
 
 const P = "#FC5200";
@@ -154,7 +154,7 @@ export default function OnboardingPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold mb-2">Ukentlig kilometergrense nÃ¥</label>
+                <label className="block text-sm font-semibold mb-2">Ukentlig kilometergrense nå</label>
                 <input
                   type="text"
                   placeholder="f.eks. 30 km/uke"
@@ -178,7 +178,7 @@ export default function OnboardingPage() {
                 { days: 3, label: "3 dager per uke", detail: "Minimal belastning" },
                 { days: 4, label: "4 dager per uke", detail: "Balansert" },
                 { days: 5, label: "5 dager per uke", detail: "Engasjert" },
-                { days: 6, label: "6 dager per uke", detail: "HÃ¸y ytelse" },
+                { days: 6, label: "6 dager per uke", detail: "Høy ytelse" },
               ].map(({ days, label, detail }) => (
                 <button
                   key={days}
@@ -200,14 +200,14 @@ export default function OnboardingPage() {
           {currentStep.id === "timeline" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold mb-2">LÃ¸psdato (valgfritt)</label>
+                <label className="block text-sm font-semibold mb-2">Løpsdato (valgfritt)</label>
                 <input
                   type="date"
                   className="w-full bg-[#1A1A17] border border-[#2E2E29] rounded-xl px-4 py-3.5 text-[#F2F2F0] focus:outline-none focus:border-[#FC5200] transition-colors [color-scheme:dark]"
                   onChange={(e) => setData((p) => ({ ...p, raceDate: e.target.value }))}
                 />
               </div>
-              <p className="text-xs text-[#5A5A54] text-center">La stÃ¥ blank â€” da velger Claude optimal varighet</p>
+              <p className="text-xs text-[#5A5A54] text-center">La stå blank — da velger Claude optimal varighet</p>
               <button
                 onClick={() => setStep((s) => s + 1)}
                 className="w-full flex items-center justify-center gap-2 bg-[#FC5200] text-white py-4 rounded-xl font-bold hover:bg-[#E04800] transition-colors"
@@ -233,7 +233,7 @@ function GeneratingStep({ onComplete }: { onComplete: () => void }) {
     "Analyserer din kondisjonsprofil...",
     "Beregner optimale treningssoner...",
     "Strukturerer ukentlig progresjon...",
-    "Legger til styrke- og mobilitetsÃ¸kter...",
+    "Legger til styrke- og mobilitetsøkter...",
     "Ferdigstiller din personlige plan...",
   ];
 
@@ -267,7 +267,7 @@ function GeneratingStep({ onComplete }: { onComplete: () => void }) {
             }`}
           >
             <span className="w-5 h-5 rounded-full border flex items-center justify-center text-xs shrink-0 border-current">
-              {i < phase ? "âœ“" : i === phase ? "Â·" : ""}
+              {i < phase ? "âœ“" : i === phase ? "·" : ""}
             </span>
             {p}
           </div>

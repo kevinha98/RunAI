@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { ArrowRight, Brain, Zap, TrendingUp, Watch, MessageCircle, Repeat, ChevronRight } from "lucide-react";
 
 const FEATURES = [
@@ -6,68 +6,68 @@ const FEATURES = [
     icon: Brain,
     title: "Claude-drevne planer",
     description:
-      "Ingen maler. Claude lager et ekte, unikt treningsprogram fra bunn â€” basert pÃ¥ din lÃ¸pshistorikk, mÃ¥l, sÃ¸vn og hvile. Og omskriver det ukentlig.",
+      "Ingen maler. Claude lager et ekte, unikt treningsprogram fra bunn — basert på din løpshistorikk, mål, søvn og hvile. Og omskriver det ukentlig.",
   },
   {
     icon: Repeat,
     title: "Ekte tilpasning",
     description:
-      "Knuste du en terskelÃ¸kt? Neste uke blir tÃ¸ffere. Gikk du glipp av to Ã¸kter? Programmet restrukturerer seg stille â€” uten at du trenger Ã¥ spÃ¸rre.",
+      "Knuste du en terskeløkt? Neste uke blir tøffere. Gikk du glipp av to økter? Programmet restrukturerer seg stille — uten at du trenger å spørre.",
   },
   {
     icon: MessageCircle,
     title: "Din AI-trener, 24/7",
     description:
-      "SpÃ¸r Â«Hvorfor gjÃ¸r jeg denne intervallÃ¸kten?Â» eller Â«Jeg er sliten â€” bÃ¸r jeg hoppe over?Â» Coachen din kjenner din fulle treningshistorikk og gir deg et ekte svar.",
+      "Spør «Hvorfor gjør jeg denne intervalløkten?» eller «Jeg er sliten — bør jeg hoppe over?» Coachen din kjenner din fulle treningshistorikk og gir deg et ekte svar.",
   },
   {
     icon: Watch,
     title: "Synkroniserer alt",
     description:
-      "Apple Health, Google Health Connect, Garmin, Strava â€” all data flyter inn automatisk. Coachen din ser hva du faktisk gjorde, ikke hva du planla.",
+      "Apple Health, Google Health Connect, Garmin, Strava — all data flyter inn automatisk. Coachen din ser hva du faktisk gjorde, ikke hva du planla.",
   },
   {
     icon: TrendingUp,
-    title: "LÃ¸psprediksjon",
+    title: "Løpsprediksjon",
     description:
-      "Basert pÃ¥ din reelle treningsdata forutsier RunAI finishen din med konfidensintervaller â€” og viser deg nÃ¸yaktig hva du mÃ¥ endre for Ã¥ nÃ¥ mÃ¥let.",
+      "Basert på din reelle treningsdata forutsier RunAI finishen din med konfidensintervaller — og viser deg nøyaktig hva du må endre for å nå målet.",
   },
   {
     icon: Zap,
     title: "Styrke og bevegelighet",
     description:
-      "AI-genererte styrke- og mobilitetsÃ¸kter som passer rundt lÃ¸pingen din uten Ã¥ overbelaste. LÃ¸perspesifikk, ikke generiske treningsstudioplaner.",
+      "AI-genererte styrke- og mobilitetsøkter som passer rundt løpingen din uten å overbelaste. Løperspesifikk, ikke generiske treningsstudioplaner.",
   },
 ];
 
 const TESTIMONIALS = [
   {
     quote:
-      "Jeg har prÃ¸vd Runna, Garmin Coach og Nike Run Club. RunAI er den fÃ¸rste som faktisk fÃ¸ltes som den fulgte med pÃ¥ hva jeg gjorde og responderte.",
+      "Jeg har prøvd Runna, Garmin Coach og Nike Run Club. RunAI er den første som faktisk føltes som den fulgte med på hva jeg gjorde og responderte.",
     name: "Markus T.",
-    detail: "3:42 maraton â†’ 3:21 pÃ¥ 16 uker",
+    detail: "3:42 maraton → 3:21 på 16 uker",
   },
   {
     quote:
-      "Spurte coachen min hvorfor lette lÃ¸p fÃ¸ltes sÃ¥ tunge. Den forklarte aerob baseunderskudd og justerte planen pÃ¥ stedet. Imponerende.",
+      "Spurte coachen min hvorfor lette løp føltes så tunge. Den forklarte aerob baseunderskudd og justerte planen på stedet. Imponerende.",
     name: "Sofie L.",
-    detail: "FÃ¸rste halvmaratonfinisher",
+    detail: "Første halvmaratonfinisher",
   },
   {
     quote:
-      "Gikk glipp av en uke med forkjÃ¸lelse. I stedet for Ã¥ falle bak, bygde appen de siste 6 ukene av maratonblokken rundt hullet. LÃ¸p PR.",
+      "Gikk glipp av en uke med forkjølelse. I stedet for å falle bak, bygde appen de siste 6 ukene av maratonblokken rundt hullet. Løp PR.",
     name: "James K.",
     detail: "2:58 maraton-PB",
   },
 ];
 
 const PLANS = [
-  { distance: "5K", weeks: "6â€“12 uker", desc: "Perfekt start" },
-  { distance: "10K", weeks: "8â€“16 uker", desc: "Neste steg" },
-  { distance: "Halvmaraton", weeks: "10â€“20 uker", desc: "Mestre 21K" },
-  { distance: "Maraton", weeks: "16â€“24 uker", desc: "Hele distansen" },
-  { distance: "Ultra", weeks: "20â€“36 uker", desc: "Utover maraton" },
-  { distance: "Egendefinert", weeks: "Hvilken som helst dato", desc: "Ditt mÃ¥l, dine vilkÃ¥r" },
+  { distance: "5K", weeks: "6–12 uker", desc: "Perfekt start" },
+  { distance: "10K", weeks: "8–16 uker", desc: "Neste steg" },
+  { distance: "Halvmaraton", weeks: "10–20 uker", desc: "Mestre 21K" },
+  { distance: "Maraton", weeks: "16–24 uker", desc: "Hele distansen" },
+  { distance: "Ultra", weeks: "20–36 uker", desc: "Utover maraton" },
+  { distance: "Egendefinert", weeks: "Hvilken som helst dato", desc: "Ditt mål, dine vilkår" },
 ];
 
 const PRICING = [
@@ -76,7 +76,7 @@ const PRICING = [
     price: "0",
     period: "",
     desc: "Kom i gang",
-    features: ["1 treningsplan", "Grunnleggende ukeplaner", "AI-coach (10 spÃ¸rsmÃ¥l/uke)", "Strava-synkronisering"],
+    features: ["1 treningsplan", "Grunnleggende ukeplaner", "AI-coach (10 spørsmål/uke)", "Strava-synkronisering"],
     cta: "Start gratis",
     href: "/onboarding",
     highlight: false,
@@ -85,8 +85,8 @@ const PRICING = [
     name: "Pro",
     price: "99",
     period: "kr/mnd",
-    desc: "For den seriÃ¸se lÃ¸peren",
-    features: ["Ubegrensede planer", "Ukentlig plan-regenerering", "Ubegrenset AI-coach", "Alle integrasjoner", "LÃ¸psprediksjon", "StyrkeÃ¸kter"],
+    desc: "For den seriøse løperen",
+    features: ["Ubegrensede planer", "Ukentlig plan-regenerering", "Ubegrenset AI-coach", "Alle integrasjoner", "Løpsprediksjon", "Styrkeøkter"],
     cta: "Start Pro",
     href: "/onboarding",
     highlight: true,
@@ -96,7 +96,7 @@ const PRICING = [
     price: "249",
     period: "kr/mnd",
     desc: "Toppytelse",
-    features: ["Alt i Pro", "Prioritert AI-respons", "Avansert ytelsesanalyse", "Egendefinerte makrosykluser", "Eksport til Garmin/Polar", "Dedikert stÃ¸tte"],
+    features: ["Alt i Pro", "Prioritert AI-respons", "Avansert ytelsesanalyse", "Egendefinerte makrosykluser", "Eksport til Garmin/Polar", "Dedikert støtte"],
     cta: "Start Elite",
     href: "/onboarding",
     highlight: false,
@@ -150,14 +150,14 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-5xl sm:text-6xl md:text-8xl font-black tracking-tighter leading-[0.95] mb-8">
-            Din lÃ¸pecoach
+            Din løpecoach
             <br />
             <span className="text-[#FC5200]">tenker faktisk.</span>
           </h1>
 
           <p className="text-lg sm:text-xl text-[#9A9A92] max-w-2xl mx-auto leading-relaxed mb-12">
-            RunAI lager et personlig treningsprogram basert pÃ¥ din historikk og mÃ¥l â€”
-            og omskriver det hver uke ut fra hvordan du faktisk lÃ¸per.
+            RunAI lager et personlig treningsprogram basert på din historikk og mål —
+            og omskriver det hver uke ut fra hvordan du faktisk løper.
             Ikke maler. Ekte AI.
           </p>
 
@@ -166,7 +166,7 @@ export default function LandingPage() {
               href="/onboarding"
               className="flex items-center gap-2.5 bg-[#FC5200] text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-[#E04800] transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              FÃ¥ din gratis plan
+              Få din gratis plan
               <ArrowRight size={18} />
             </Link>
             <Link
@@ -178,7 +178,7 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <p className="text-xs text-[#5A5A54]">FÃ¸rste uke gratis Â· Inget kredittkort Â· Avslutt nÃ¥r du vil</p>
+          <p className="text-xs text-[#5A5A54]">Første uke gratis · Inget kredittkort · Avslutt når du vil</p>
         </div>
       </section>
 
@@ -206,7 +206,7 @@ export default function LandingPage() {
               Ikke en mal.<br className="sm:hidden" /> En ekte trener.
             </h2>
             <p className="text-[#9A9A92] text-lg max-w-xl mx-auto leading-relaxed">
-              Alle andre apper gir deg samme plan som alle andre. RunAI starter fra bunn â€” for deg.
+              Alle andre apper gir deg samme plan som alle andre. RunAI starter fra bunn — for deg.
             </p>
           </div>
 
@@ -235,9 +235,9 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
-              Alle distanser.<br className="sm:hidden" /> Alle nivÃ¥er.
+              Alle distanser.<br className="sm:hidden" /> Alle nivåer.
             </h2>
-            <p className="text-[#9A9A92] text-lg">Fortell RunAI mÃ¥let ditt. Den ordner resten.</p>
+            <p className="text-[#9A9A92] text-lg">Fortell RunAI målet ditt. Den ordner resten.</p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -263,8 +263,8 @@ export default function LandingPage() {
       <section className="py-28 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">Hva lÃ¸pere sier</h2>
-            <p className="text-[#9A9A92]">Ekte resultater fra ekte lÃ¸pere.</p>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">Hva løpere sier</h2>
+            <p className="text-[#9A9A92]">Ekte resultater fra ekte løpere.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
@@ -290,7 +290,7 @@ export default function LandingPage() {
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
               Enkel prissetting.
             </h2>
-            <p className="text-[#9A9A92] text-lg">Ingen overraskelser. Avslutt nÃ¥r du vil.</p>
+            <p className="text-[#9A9A92] text-lg">Ingen overraskelser. Avslutt når du vil.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
@@ -346,21 +346,21 @@ export default function LandingPage() {
         </div>
         <div className="relative max-w-3xl mx-auto">
           <h2 className="text-5xl md:text-6xl font-black tracking-tight mb-6 leading-tight">
-            Klar til Ã¥ bli
+            Klar til å bli
             <span className="text-[#FC5200]"> bedre</span>?
           </h2>
           <p className="text-[#9A9A92] text-xl mb-10 leading-relaxed">
-            Slutt Ã¥ fÃ¸lge generiske planer. Begynn Ã¥ trene med en coach
-            som faktisk ser pÃ¥ hva du gjÃ¸r.
+            Slutt å følge generiske planer. Begynn å trene med en coach
+            som faktisk ser på hva du gjør.
           </p>
           <Link
             href="/onboarding"
             className="inline-flex items-center gap-2.5 bg-[#FC5200] text-white px-10 py-5 rounded-xl font-bold text-xl hover:bg-[#E04800] transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
-            FÃ¥ din gratis plan
+            Få din gratis plan
             <ArrowRight size={20} />
           </Link>
-          <p className="text-xs text-[#5A5A54] mt-5">FÃ¸rste uke gratis Â· Inget kredittkort Â· Avslutt nÃ¥r du vil</p>
+          <p className="text-xs text-[#5A5A54] mt-5">Første uke gratis · Inget kredittkort · Avslutt når du vil</p>
         </div>
       </section>
 
@@ -372,11 +372,11 @@ export default function LandingPage() {
               <span className="text-white font-black text-xs">R</span>
             </div>
             <span className="font-bold text-sm">RunAI</span>
-            <span className="text-[#5A5A54] text-sm ml-2">AI-drevet lÃ¸pecoach</span>
+            <span className="text-[#5A5A54] text-sm ml-2">AI-drevet løpecoach</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-[#5A5A54]">
             <Link href="/personvern" className="hover:text-[#9A9A92] transition-colors">Personvern</Link>
-            <Link href="/vilkar" className="hover:text-[#9A9A92] transition-colors">VilkÃ¥r</Link>
+            <Link href="/vilkar" className="hover:text-[#9A9A92] transition-colors">Vilkår</Link>
             <Link href="/kontakt" className="hover:text-[#9A9A92] transition-colors">Kontakt</Link>
           </div>
           <p className="text-xs text-[#5A5A54]">Â© 2026 RunAI. Alle rettigheter forbeholdt.</p>

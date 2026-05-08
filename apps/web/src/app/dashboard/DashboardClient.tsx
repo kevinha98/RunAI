@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import {
@@ -18,17 +18,17 @@ import { formatPace } from "@/lib/strava-types";
 const STRAVA_ORANGE = "#FC5200";
 const P = "#FC5200";
 
-// Treningsplan â€” administreres av AI; erstattes av generert plan fra /api/generate-plan
+// Treningsplan — administreres av AI; erstattes av generert plan fra /api/generate-plan
 const MOCK_PLAN = {
   raceDate: "2026-08-22",
   thisWeek: [
-    { day: "Man", type: "Lett lÃ¸ping", distance: "8 km", pace: "5:45/km", done: true },
-    { day: "Tir", type: "Styrke", distance: "45 min", pace: "LÃ¸peÃ¸velser", done: true },
-    { day: "Ons", type: "TerskelÃ¸kt", distance: "10 km", pace: "4:50/km", done: false, today: true },
-    { day: "Tor", type: "Hvile", distance: "â€”", pace: "Restitusjon", done: false },
-    { day: "Fre", type: "Lett lÃ¸ping", distance: "6 km", pace: "5:50/km", done: false },
-    { day: "LÃ¸r", type: "LangkjÃ¸ring", distance: "18 km", pace: "6:00/km", done: false },
-    { day: "SÃ¸n", type: "Hvile", distance: "â€”", pace: "Restitusjon", done: false },
+    { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:45/km", done: true },
+    { day: "Tir", type: "Styrke", distance: "45 min", pace: "Løpeøvelser", done: true },
+    { day: "Ons", type: "Terskeløkt", distance: "10 km", pace: "4:50/km", done: false, today: true },
+    { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", done: false },
+    { day: "Fre", type: "Lett løping", distance: "6 km", pace: "5:50/km", done: false },
+    { day: "Lør", type: "Langkjøring", distance: "18 km", pace: "6:00/km", done: false },
+    { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", done: false },
   ],
 };
 
@@ -53,7 +53,7 @@ function formatMovingTime(secs: number) {
 }
 
 function activityPace(activity: { distance: number; moving_time: number }) {
-  if (!activity.distance || !activity.moving_time) return "â€”";
+  if (!activity.distance || !activity.moving_time) return "—";
   const secPerKm = activity.moving_time / (activity.distance / 1000);
   return formatPace(secPerKm);
 }
@@ -78,16 +78,16 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
 
   const metrics = hasData
     ? [
-        { label: "Ukentlig km", value: computed.weeklyKm.toFixed(1), unit: "km", delta: `${computed.weeklyRuns} Ã¸kt${computed.weeklyRuns !== 1 ? "er" : ""}`, positive: true },
-        { label: "Snittfart", value: formatPace(computed.avgPaceSecPerKm), unit: "/km", delta: "Siste 5 lÃ¸p", positive: true },
-        { label: "Hittil i Ã¥r", value: computed.ytdKm.toFixed(0), unit: "km", delta: `${computed.totalRunsAllTime} lÃ¸p totalt`, positive: true },
+        { label: "Ukentlig km", value: computed.weeklyKm.toFixed(1), unit: "km", delta: `${computed.weeklyRuns} økt${computed.weeklyRuns !== 1 ? "er" : ""}`, positive: true },
+        { label: "Snittfart", value: formatPace(computed.avgPaceSecPerKm), unit: "/km", delta: "Siste 5 løp", positive: true },
+        { label: "Hittil i år", value: computed.ytdKm.toFixed(0), unit: "km", delta: `${computed.totalRunsAllTime} løp totalt`, positive: true },
         { label: "Lengste (30d)", value: computed.longestRunKm.toFixed(1), unit: "km", delta: "Siste 30 dager", positive: true },
       ]
     : [
-        { label: "Ukentlig km", value: "â€”", unit: "km", delta: "Koble Strava", positive: true },
-        { label: "Snittfart", value: "â€”", unit: "/km", delta: "Koble Strava", positive: true },
-        { label: "Hittil i Ã¥r", value: "â€”", unit: "km", delta: "Koble Strava", positive: true },
-        { label: "Lengste (30d)", value: "â€”", unit: "km", delta: "Koble Strava", positive: true },
+        { label: "Ukentlig km", value: "—", unit: "km", delta: "Koble Strava", positive: true },
+        { label: "Snittfart", value: "—", unit: "/km", delta: "Koble Strava", positive: true },
+        { label: "Hittil i år", value: "—", unit: "km", delta: "Koble Strava", positive: true },
+        { label: "Lengste (30d)", value: "—", unit: "km", delta: "Koble Strava", positive: true },
       ];
 
   return (
@@ -138,7 +138,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
               )}
               <form action="/api/strava/sync" method="POST" className="mt-1.5 pl-6">
                 <button type="submit" className="flex items-center gap-1 text-[10px] text-[#5A5A54] hover:text-[#FC5200] transition-colors">
-                  <RefreshCw size={9} /> Synkroniser nÃ¥
+                  <RefreshCw size={9} /> Synkroniser nå
                 </button>
               </form>
             </div>
@@ -172,14 +172,14 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
             <h1 className="text-2xl font-black tracking-tight">
               God dag, {athleteName} ðŸ‘‹
             </h1>
-            <p className="text-[#9A9A92] text-sm mt-1">{daysUntilRace} dager til lÃ¸psdagen</p>
+            <p className="text-[#9A9A92] text-sm mt-1">{daysUntilRace} dager til løpsdagen</p>
           </div>
           <Link
             href="/dashboard/coach"
             className="flex items-center gap-2 bg-[#1A1A17] border border-[#2E2E29] hover:border-[rgba(252,82,0,0.40)] px-4 py-2.5 rounded-xl text-sm transition-colors"
           >
             <MessageCircle size={14} className="text-[#FC5200]" />
-            SpÃ¸r treneren din
+            Spør treneren din
           </Link>
         </div>
 
@@ -191,7 +191,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                 <div className="text-xs text-[#FC5200] font-bold uppercase tracking-widest mb-1">I dag</div>
                 <h2 className="text-xl font-black tracking-tight mb-1">{today.type}</h2>
                 <p className="text-[#9A9A92] text-sm">
-                  {today.distance} Â· MÃ¥lfart {today.pace}
+                  {today.distance} · Målfart {today.pace}
                 </p>
               </div>
               <button className="flex items-center gap-2 bg-[#FC5200] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-[#E04800] transition-colors">
@@ -250,7 +250,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-[#5A5A54]">{d.distance} Â· {d.pace}</span>
+                      <span className="text-xs text-[#5A5A54]">{d.distance} · {d.pace}</span>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#3A3A35]"}`}>
                       {d.done && <span className="text-white text-xs font-bold">âœ“</span>}
@@ -266,7 +266,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
                     <StravaIcon />
-                    <h3 className="font-bold">Siste lÃ¸p</h3>
+                    <h3 className="font-bold">Siste løp</h3>
                   </div>
                   <span className="text-xs text-[#5A5A54]">fra Strava</span>
                 </div>
@@ -282,7 +282,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold truncate">{run.name}</div>
                         <div className="text-xs text-[#5A5A54]">
-                          {metersToKm(run.distance)} km Â· {activityPace(run)} Â· {formatMovingTime(run.moving_time)}
+                          {metersToKm(run.distance)} km · {activityPace(run)} · {formatMovingTime(run.moving_time)}
                         </div>
                       </div>
                       {run.average_heartrate && (
@@ -307,10 +307,10 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
             </div>
             <div className="flex-1 space-y-3 mb-5">
               <div className="bg-[#222220] rounded-xl p-3.5 text-xs text-[#9A9A92] leading-relaxed">
-                &ldquo;Flott terskelÃ¸kt mandag! Farten var 4 sekunder raskere enn mÃ¥l. Jeg har justert onsdagens Ã¸kt litt opp for Ã¥ opprettholde stimulansen.&rdquo;
+                &ldquo;Flott terskeløkt mandag! Farten var 4 sekunder raskere enn mål. Jeg har justert onsdagens økt litt opp for å opprettholde stimulansen.&rdquo;
               </div>
               <div className="bg-[#222220] rounded-xl p-3.5 text-xs text-[#9A9A92] leading-relaxed">
-                &ldquo;LangkjÃ¸ringen lÃ¸rdag er nÃ¸kkelÃ¸kten denne uken. Hold 6:00/km, og vi er pÃ¥ vei mot 1:52.&rdquo;
+                &ldquo;Langkjøringen lørdag er nøkkeløkten denne uken. Hold 6:00/km, og vi er på vei mot 1:52.&rdquo;
               </div>
             </div>
             <Link
