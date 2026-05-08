@@ -16,7 +16,6 @@
     "db:push": "turbo run db:push"
   },
   "devDependencies": {
-    "turbo": "^2.5.4",
     "typescript": "^5.7.3",
     "@types/node": "^22.10.2"
   },
