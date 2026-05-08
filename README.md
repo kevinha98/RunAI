@@ -104,6 +104,15 @@ RunAI/
 |---|---|---|
 | `/api/coach` | `POST` | Streaming Claude-coach (SSE) |
 | `/api/generate-plan` | `POST` | Generer komplett treningsplan som JSON |
+| `/api/strava/connect` | `GET` | Start Strava OAuth 2.0-flyt |
+| `/api/strava/callback` | `GET` | OAuth-callback, hent og lagre tokens |
+| `/api/strava/athlete` | `GET` | Hent innlogget Strava-utøver |
+| `/api/strava/activities` | `GET` | Hent løpsaktiviteter fra Strava |
+| `/api/strava/sync` | `POST` | Full aktivitetssynkronisering |
+| `/api/strava/refresh` | `POST` | Oppdater Strava-token |
+| `/api/strava/subscribe` | `POST` | Registrer Strava-webhook |
+| `/api/strava/webhook` | `GET/POST` | Motta sanntidshendelser fra Strava |
+| `/api/debug` | `GET` | Debug-informasjon (dev) |
 
 ---
 
@@ -141,10 +150,23 @@ cp apps/web/.env.example apps/web/.env.local
 
 ```env
 # apps/web/.env.local
-ANTHROPIC_API_KEY=sk-ant-...
+
+# LLM — Radical Gateway (primær) eller Anthropic direkte (fallback)
+RADICAL_GATEWAY_TOKEN=your_gateway_token_here
+# ANTHROPIC_API_KEY=sk-ant-...
+
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
+
+# Strava OAuth 2.0 (registrer app på https://www.strava.com/settings/api)
+STRAVA_CLIENT_ID=your_strava_client_id
+STRAVA_CLIENT_SECRET=your_strava_client_secret
+STRAVA_WEBHOOK_VERIFY_TOKEN=your_verify_token_here
+
+# Base URL for OAuth-callback
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ### Database
@@ -206,8 +228,9 @@ Denne filen fungerer som grunnlag for AI-coachens systemprompt og tilpasses dyna
 - [x] Prisma-schema (brukere, planer, uker, økter, aktiviteter)
 - [x] Expo mobil-app med 4 faner (I dag, Plan, Coach, Fremgang)
 - [x] Treningskontekst fra halvmaratonprogrammet
-- [ ] Supabase-autentisering
-- [ ] Strava-integrasjon
+- [x] Supabase-autentisering (Google OAuth via Supabase Auth)
+- [x] Strava-integrasjon (OAuth 2.0, aktivitetssynk, sanntids-webhook)
+- [x] Dashboard med Coach, Plan, Fremgang og Styrke-sider
 - [ ] Apple Health / Health Connect-synkronisering
 - [ ] Ukentlig auto-regenerering av plan
 - [ ] Push-varsler
