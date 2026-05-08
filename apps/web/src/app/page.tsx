@@ -186,9 +186,9 @@ export default function LandingPage() {
       <section className="border-y border-[#2E2E29] py-10 px-6">
         <div className="max-w-3xl mx-auto grid grid-cols-3 gap-8 text-center">
           {[
-            { value: "4.9â˜…", label: "App Store-vurdering" },
+            { value: "4.9★", label: "App Store-vurdering" },
             { value: "Ukentlig", label: "Plan-regenerering" },
-            { value: "âˆž", label: "Coach-samtaler" },
+            { value: "∞", label: "Coach-samtaler" },
           ].map((stat) => (
             <div key={stat.label}>
               <div className="text-3xl sm:text-4xl font-black text-[#FC5200] tabular-nums">{stat.value}</div>
@@ -379,7 +379,7 @@ export default function LandingPage() {
             <Link href="/vilkar" className="hover:text-[#9A9A92] transition-colors">Vilkår</Link>
             <Link href="/kontakt" className="hover:text-[#9A9A92] transition-colors">Kontakt</Link>
           </div>
-          <p className="text-xs text-[#5A5A54]">Â© 2026 RunAI. Alle rettigheter forbeholdt.</p>
+          <p className="text-xs text-[#5A5A54]">© 2026 RunAI. Alle rettigheter forbeholdt.</p>
         </div>
       </footer>
     </div>

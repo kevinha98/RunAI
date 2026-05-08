@@ -170,7 +170,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-black tracking-tight">
-              God dag, {athleteName} ðŸ‘‹
+              God dag, {athleteName} 👋
             </h1>
             <p className="text-[#9A9A92] text-sm mt-1">{daysUntilRace} dager til løpsdagen</p>
           </div>
@@ -253,7 +253,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                       <span className="text-xs text-[#5A5A54]">{d.distance} · {d.pace}</span>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#3A3A35]"}`}>
-                      {d.done && <span className="text-white text-xs font-bold">âœ“</span>}
+                      {d.done && <span className="text-white text-xs font-bold">✓</span>}
                     </div>
                   </div>
                 ))}
@@ -287,7 +287,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                       </div>
                       {run.average_heartrate && (
                         <span className="text-xs text-[#ef4444] shrink-0 font-semibold">
-                          â™¥ {Math.round(run.average_heartrate)}
+                          ♥ {Math.round(run.average_heartrate)}
                         </span>
                       )}
                     </div>
