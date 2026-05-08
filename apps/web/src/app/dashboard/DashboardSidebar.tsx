@@ -1,6 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Activity, Calendar, Brain, TrendingUp, Zap, RefreshCw } from "lucide-react";
 import type { StoredStats } from "@/lib/strava-types";
+import { createClient } from "@/lib/supabase/server";
+import { SignOutButton } from "@/components/SignOutButton";
 
 const STRAVA_ORANGE = "#FC5200";
 
@@ -25,10 +28,18 @@ interface Props {
   activePath: string;
 }
 
-export default function DashboardSidebar({ stats, activePath }: Props) {
+export default async function DashboardSidebar({ stats, activePath }: Props) {
   const { athlete, lastSync } = stats;
-  const athleteName = athlete?.firstname ?? null;
   const isStravaLinked = athlete !== null;
+
+  // Get the signed-in Google user from Supabase
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const googleName = user?.user_metadata?.full_name as string | undefined;
+  const googleAvatar = user?.user_metadata?.avatar_url as string | undefined;
+  const displayName = googleName ?? athlete?.firstname ?? null;
+  const displayEmail = user?.email ?? null;
 
   return (
     <div className="fixed left-0 top-0 bottom-0 w-60 border-r border-[#2E2E29] bg-[#111110] flex flex-col p-5 z-40">
@@ -96,15 +107,30 @@ export default function DashboardSidebar({ stats, activePath }: Props) {
         )}
 
         <div className="flex items-center gap-3 px-3">
-          <div className="w-8 h-8 bg-[#FC5200] rounded-full flex items-center justify-center text-white font-bold text-sm">
-            {athleteName ? athleteName[0].toUpperCase() : "?"}
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-[#F2F2F0]">
-              {athleteName ?? "Ikke tilkoblet"}
+          {googleAvatar ? (
+            <Image
+              src={googleAvatar}
+              alt={displayName ?? "User avatar"}
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <div className="w-8 h-8 bg-[#FC5200] rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0">
+              {displayName ? displayName[0].toUpperCase() : "?"}
             </div>
-            <div className="text-xs text-[#5A5A54]">RunAI</div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-[#F2F2F0] truncate">
+              {displayName ?? "Bruker"}
+            </div>
+            {displayEmail && (
+              <div className="text-[10px] text-[#5A5A54] truncate">{displayEmail}</div>
+            )}
           </div>
+        </div>
+        <div className="px-3 mt-2">
+          <SignOutButton />
         </div>
       </div>
     </div>
