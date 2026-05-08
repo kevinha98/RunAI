@@ -1,9 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
-
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { llm, MODELS } from "@/lib/llm";
 
 // System prompt — injected with user's plan context
 const COACH_SYSTEM_PROMPT = `You are RunAI, an elite AI running coach powered by Claude. You have deep expertise in exercise physiology, training periodization, and running performance.
@@ -42,8 +38,8 @@ export async function POST(req: NextRequest) {
     // Filter to valid Anthropic message format (skip initial assistant greeting)
     const anthropicMessages = messages.filter((m) => m.content.trim().length > 0);
 
-    const stream = client.messages.stream({
-      model: "claude-sonnet-4-5",
+    const stream = llm.messages.stream({
+      model: MODELS.SONNET,
       max_tokens: 1024,
       system: COACH_SYSTEM_PROMPT,
       messages: anthropicMessages,

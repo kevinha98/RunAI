@@ -1,9 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
-
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { llm, MODELS } from "@/lib/llm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,8 +55,8 @@ Return a JSON object with this exact structure:
 
 Return ONLY valid JSON. No markdown, no explanation.`;
 
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-5",
+    const message = await llm.messages.create({
+      model: MODELS.SONNET,
       max_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
     });
