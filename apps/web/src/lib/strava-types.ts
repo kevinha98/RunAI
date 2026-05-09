@@ -28,6 +28,101 @@ export interface StoredStats {
   computed: ComputedMetrics;
 }
 
+// ─── Pace Zone Types ─────────────────────────────────────────────────────────
+
+export type PaceZoneLabel = 'Lett' | 'Moderat' | 'Terskel' | 'VO2max';
+
+export interface PaceZone {
+  label: PaceZoneLabel;
+  bgClass: string;
+  textClass: string;
+  borderClass: string;
+  dotClass: string;
+}
+
+// ─── Pace Zone Config ────────────────────────────────────────────────────────
+
+const PACE_ZONES: Record<PaceZoneLabel, PaceZone> = {
+  Lett:    { label: 'Lett',    bgClass: 'bg-green-100',  textClass: 'text-green-800',  borderClass: 'border-green-300',  dotClass: 'bg-green-500'  },
+  Moderat: { label: 'Moderat', bgClass: 'bg-blue-100',   textClass: 'text-blue-800',   borderClass: 'border-blue-300',   dotClass: 'bg-blue-500'   },
+  Terskel: { label: 'Terskel', bgClass: 'bg-orange-100', textClass: 'text-orange-800', borderClass: 'border-orange-300', dotClass: 'bg-orange-500' },
+  VO2max:  { label: 'VO2max',  bgClass: 'bg-red-100',    textClass: 'text-red-800',    borderClass: 'border-red-300',    dotClass: 'bg-red-500'    },
+};
+
+/**
+ * Classify a run's pace into a training zone relative to the user's average pace.
+ *
+ * Zone boundaries (relative to avgPaceSecPerKm — higher sec/km = slower):
+ *   Lett     : secPerKm > avg * 1.10   (easy / recovery)
+ *   Moderat  : avg * 1.00 <= secPerKm <= avg * 1.10
+ *   Terskel  : avg * 0.88 <= secPerKm < avg * 1.00
+ *   VO2max   : secPerKm < avg * 0.88    (hard / race pace)
+ *
+ * @param secPerKm        - The run's average pace in seconds per km
+ * @param avgPaceSecPerKm - The user's overall average pace in seconds per km
+ * @returns PaceZone object with label and Tailwind classes
+ */
+export function classifyPaceZone(
+  secPerKm: number,
+  avgPaceSecPerKm: number
+): PaceZone {
+  if (!secPerKm || secPerKm <= 0 || !avgPaceSecPerKm || avgPaceSecPerKm <= 0) {
+    return PACE_ZONES['Moderat'];
+  }
+  if (secPerKm > avgPaceSecPerKm * 1.10) return PACE_ZONES['Lett'];
+  if (secPerKm >= avgPaceSecPerKm * 1.00) return PACE_ZONES['Moderat'];
+  if (secPerKm >= avgPaceSecPerKm * 0.88) return PACE_ZONES['Terskel'];
+  return PACE_ZONES['VO2max'];
+}
+
+// ─── Zone Distribution ───────────────────────────────────────────────────────
+
+export interface ZoneDistribution {
+  zone: PaceZone;
+  count: number;
+  percentage: number;
+}
+
+/**
+ * Computes distribution of pace zones for the last N runs.
+ *
+ * @param runs            - Array of StravaActivity (recent runs)
+ * @param avgPaceSecPerKm - User's overall average pace in sec/km
+ * @param limit           - How many recent runs to include (default 10)
+ * @returns Array of ZoneDistribution sorted by zone order (Lett → VO2max)
+ */
+export function computePaceZoneDistribution(
+  runs: StravaActivity[],
+  avgPaceSecPerKm: number,
+  limit = 10
+): ZoneDistribution[] {
+  const zoneOrder: PaceZoneLabel[] = ['Lett', 'Moderat', 'Terskel', 'VO2max'];
+  const counts: Record<PaceZoneLabel, number> = {
+    Lett: 0,
+    Moderat: 0,
+    Terskel: 0,
+    VO2max: 0,
+  };
+
+  const recent = runs.slice(0, limit);
+  const total = recent.length;
+
+  for (const run of recent) {
+    const secPerKm =
+      run.distance > 0 && run.moving_time > 0
+        ? run.moving_time / (run.distance / 1000)
+        : 0;
+    const zone = classifyPaceZone(secPerKm, avgPaceSecPerKm);
+    counts[zone.label] += 1;
+  }
+
+  return zoneOrder.map((label) => ({
+    zone: PACE_ZONES[label],
+    count: counts[label],
+    percentage: total > 0 ? Math.round((counts[label] / total) * 100) : 0,
+  }));
+}
+
 // ─── Pure formatting helpers — safe for client components ───────────────────
 
 /** Convert seconds-per-km to "M:SS" string, e.g. 321 → "5:21" */

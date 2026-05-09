@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
@@ -32,6 +32,7 @@ function getPlanSessions() {
   const weekData = WEEKS.find((w) => w.week === getCurrentWeek()) ?? WEEKS[0];
   return weekData.sessions.map((s) => ({ ...s, dayIdx: DAY_IDX[s.day] ?? 0 }));
 }
+
 // Helpers
 
 function metersToKm(m: number) { return (m / 1000).toFixed(1); }
@@ -54,13 +55,31 @@ function activityPaceSec(a: { distance: number; moving_time: number }) {
   return a.moving_time / (a.distance / 1000);
 }
 
+function getWeeklyPlanKm(): number {
+  const currentWeek = getCurrentWeek();
+  const weekData = WEEKS.find((w) => w.week === currentWeek) ?? WEEKS[0];
+  return weekData.totalKm;
+}
+
+function getWeeklyActualKm(runs: StravaActivity[]): number {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  return runs
+    .filter((r) => new Date(r.start_date_local) >= monday)
+    .reduce((sum, r) => sum + r.distance / 1000, 0);
+}
+
 function weeklyKmBuckets(runs: StravaActivity[], n = 8): { label: string; km: number }[] {
   const map: Record<string, number> = {};
   for (const r of runs) {
     const d = new Date(r.start_date_local);
     const jan1 = new Date(d.getFullYear(), 0, 1);
     const week = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
-    const key = `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
+    const key = `${d.getFullYear()}-W${String(week).padStart(2, "00")}`;
     map[key] = (map[key] ?? 0) + r.distance / 1000;
   }
   const sorted = Object.entries(map)
@@ -182,6 +201,49 @@ function StatCard({ icon, label, value, unit, sub, subColor = "text-[#6B6B65]" }
         {unit && <span className="text-xs text-[#6B6B65] mb-0.5">{unit}</span>}
       </div>
       <div className={`text-xs font-medium truncate ${subColor}`}>{sub}</div>
+    </div>
+  );
+}
+
+function WeeklyProgressBar({ runs }: { runs: StravaActivity[] }) {
+  const planKm = getWeeklyPlanKm();
+  const actualKm = getWeeklyActualKm(runs);
+  const roundedKm = Math.round(actualKm * 10) / 10;
+  const percent = planKm > 0 ? Math.min(100, (roundedKm / planKm) * 100) : 0;
+  const isComplete = percent >= 100;
+  const remaining = Math.max(0, Math.round((planKm - roundedKm) * 10) / 10);
+
+  return (
+    <div className="col-span-2 md:col-span-4 bg-white border border-[#E5E5E2] rounded-2xl px-4 py-3 hover:border-[#C8C8C4] transition-colors">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5 text-xs text-[#6B6B65] font-medium">
+          <BarChart2 size={13} className="text-[#FC5200]" />
+          Ukentlig km-mål
+        </div>
+        <span
+          className="text-xs font-bold"
+          style={{ color: isComplete ? "#10b981" : STRAVA_ORANGE }}
+        >
+          {roundedKm} / {planKm} km
+        </span>
+      </div>
+      <div className="w-full h-2.5 bg-[#F0F0EE] rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500 ease-out"
+          style={{
+            width: `${percent.toFixed(1)}%`,
+            backgroundColor: isComplete ? "#10b981" : STRAVA_ORANGE,
+          }}
+        />
+      </div>
+      <div className="flex justify-between mt-1.5">
+        <span className="text-[10px] text-[#6B6B65]">{Math.round(percent)}% fullført</span>
+        {isComplete ? (
+          <span className="text-[10px] font-semibold text-emerald-500">✓ Ukesmål nådd!</span>
+        ) : (
+          <span className="text-[10px] text-[#6B6B65]">{remaining} km gjenstår</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -370,7 +432,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
             />
           </div>
 
-          {/* Row 2: Volume */}
+          {/* Row 2: Volume + weekly progress bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
             <StatCard
               icon={<BarChart2 size={14} className="text-[#FC5200]" />}
@@ -400,6 +462,8 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
               unit="km"
               sub="Gjennomsnittlig distanse"
             />
+            {/* Weekly progress bar spanning full width */}
+            <WeeklyProgressBar runs={recentRuns} />
           </div>
 
           {/* Row 3: Elevation & totals */}
