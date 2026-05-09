@@ -123,6 +123,83 @@ export function computePaceZoneDistribution(
   }));
 }
 
+// ─── Computed Metrics ────────────────────────────────────────────────────────
+
+/**
+ * Compute dashboard metrics from recent runs and Strava stats.
+ *
+ * - weeklyKm / weeklyRuns : activities whose start_date falls within the last 7 days
+ * - avgPaceSecPerKm       : distance-weighted average pace across all supplied runs
+ * - longestRunKm          : longest single run (by distance) in the supplied list
+ * - totalRunsAllTime      : from StravaStats.all_run_totals (0 if stats is null)
+ * - totalKmAllTime        : from StravaStats.all_run_totals.distance in km (0 if stats is null)
+ * - ytdKm                 : from StravaStats.ytd_run_totals.distance in km (0 if stats is null)
+ *
+ * @param runs  - Array of StravaActivity (typically recentRuns)
+ * @param stats - StravaStats from the API, or null when unavailable
+ * @returns ComputedMetrics
+ */
+export function computeMetrics(
+  runs: StravaActivity[],
+  stats: StravaStats | null
+): ComputedMetrics {
+  const now = Date.now();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+  // ── Weekly aggregates ────────────────────────────────────────────────────
+  let weeklyKm = 0;
+  let weeklyRuns = 0;
+
+  for (const run of runs) {
+    const startMs = new Date(run.start_date).getTime();
+    if (now - startMs <= sevenDaysMs) {
+      weeklyKm += run.distance / 1000;
+      weeklyRuns += 1;
+    }
+  }
+
+  // ── Average pace (distance-weighted) ────────────────────────────────────
+  let totalDistanceM = 0;
+  let totalMovingTimeSec = 0;
+
+  for (const run of runs) {
+    if (run.distance > 0 && run.moving_time > 0) {
+      totalDistanceM += run.distance;
+      totalMovingTimeSec += run.moving_time;
+    }
+  }
+
+  const avgPaceSecPerKm =
+    totalDistanceM > 0
+      ? totalMovingTimeSec / (totalDistanceM / 1000)
+      : 0;
+
+  // ── Longest run ──────────────────────────────────────────────────────────
+  const longestRunKm =
+    runs.length > 0
+      ? Math.max(...runs.map((r) => r.distance / 1000))
+      : 0;
+
+  // ── All-time and YTD from StravaStats ────────────────────────────────────
+  const totalRunsAllTime = stats?.all_run_totals?.count ?? 0;
+  const totalKmAllTime = stats?.all_run_totals?.distance
+    ? stats.all_run_totals.distance / 1000
+    : 0;
+  const ytdKm = stats?.ytd_run_totals?.distance
+    ? stats.ytd_run_totals.distance / 1000
+    : 0;
+
+  return {
+    weeklyKm: Math.round(weeklyKm * 10) / 10,
+    weeklyRuns,
+    avgPaceSecPerKm: Math.round(avgPaceSecPerKm),
+    longestRunKm: Math.round(longestRunKm * 10) / 10,
+    totalRunsAllTime,
+    totalKmAllTime: Math.round(totalKmAllTime * 10) / 10,
+    ytdKm: Math.round(ytdKm * 10) / 10,
+  };
+}
+
 // ─── Pure formatting helpers — safe for client components ───────────────────
 
 /** Convert seconds-per-km to "M:SS" string, e.g. 321 → "5:21" */

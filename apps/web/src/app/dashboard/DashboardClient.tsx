@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Brain,
@@ -261,11 +262,20 @@ function StravaIcon() {
 interface Props { stravaData: StoredStats; stravaStatus?: string | null; }
 
 export default function DashboardClient({ stravaData, stravaStatus }: Props) {
+  const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
+
   const handleSync = useCallback(async () => {
     setIsSyncing(true);
-    try { await fetch("/api/strava/sync", { method: "POST" }); } finally { setIsSyncing(false); }
-  }, []);
+    try {
+      const res = await fetch("/api/strava/sync", { method: "POST" });
+      if (res.ok) {
+        router.refresh();
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [router]);
 
   const minutesSinceSync = stravaData.lastSync
     ? Math.round((Date.now() - new Date(stravaData.lastSync).getTime()) / 60000)
