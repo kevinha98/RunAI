@@ -128,6 +128,60 @@ function executeTool(
   return `Ukjent verktøy: ${name}`;
 }
 
+// ─── Running history context builder ─────────────────────────────────────────
+function buildRunningHistoryContext(stats: StoredStats): string {
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+  const runsLast7Days = stats.recentActivities.filter(
+    (a) => a.type === "Run" && new Date(a.start_date_local).getTime() >= sevenDaysAgo
+  );
+
+  const kmLast7Days = runsLast7Days.reduce((sum, a) => sum + a.distance / 1000, 0);
+  const runCountLast7Days = runsLast7Days.length;
+
+  const currentWeekNum = getCurrentWeek();
+  const currentWeekData = WEEKS[currentWeekNum - 1];
+  const phase = currentWeekData?.phase ?? "Ukjent fase";
+  const planWeekKm = currentWeekData?.totalKm ?? 0;
+
+  const daysUntilRace = Math.ceil(
+    (RACE_DATE.getTime() - now) / (1000 * 60 * 60 * 24)
+  );
+
+  const lines: string[] = [
+    `Gjeldende planuke: ${currentWeekNum}/52 — Fase: ${phase}`,
+    `Planlagt km denne uken: ${planWeekKm} km`,
+    `Faktiske løp siste 7 dager: ${runCountLast7Days} løp — ${kmLast7Days.toFixed(1)} km totalt`,
+    `Dager til Bergen City Marathon: ${daysUntilRace}`,
+  ];
+
+  if (runsLast7Days.length > 0) {
+    const detail = runsLast7Days
+      .slice(0, 7)
+      .map((a) => {
+        const km = (a.distance / 1000).toFixed(1);
+        const pace = formatPace(a.moving_time / (a.distance / 1000));
+        const date = new Date(a.start_date_local).toLocaleDateString("nb-NO", {
+          day: "numeric",
+          month: "short",
+        });
+        return `  ${date}: ${a.name} — ${km} km @ ${pace}/km`;
+      })
+      .join("\n");
+    lines.push(`Detaljer siste 7 dager:\n${detail}`);
+  } else {
+    lines.push("Ingen registrerte løp siste 7 dager.");
+  }
+
+  if (planWeekKm > 0 && kmLast7Days > 0) {
+    const pct = Math.round((kmLast7Days / planWeekKm) * 100);
+    lines.push(`Gjennomføring ift. plan: ${pct}% (${kmLast7Days.toFixed(1)} av ${planWeekKm} km)`);
+  }
+
+  return lines.join("\n");
+}
+
 // ─── System prompt ────────────────────────────────────────────────────────────
 function buildSystemPrompt(stats: StoredStats): string {
   const { athlete, computed, recentRuns } = stats;
@@ -163,6 +217,8 @@ function buildSystemPrompt(stats: StoredStats): string {
           .join("\n")
       : "Ingen nylige aktiviteter registrert.";
 
+  const runningHistoryCtx = buildRunningHistoryContext(stats);
+
   return `Du er RunAI, en AI-løpecoach drevet av Claude. Du svarer ALLTID på norsk (bokmål).
 Du har dyp ekspertise innen treningsfysiologi, periodisering og løpsprestasjon.
 
@@ -172,6 +228,10 @@ ${metricsCtx}
 Siste løp (snapshot — bruk get_full_activity_history for mer):
 ${recentCtx}
 </athlete_data>
+
+<running_history>
+${runningHistoryCtx}
+</running_history>
 
 <available_tools>
 - get_full_activity_history: Hent full aktivitetslogg (opp til 50 aktiviteter) for dypere analyse
@@ -233,12 +293,13 @@ export async function POST(req: NextRequest) {
     const MAX_TOOL_TURNS = 5;
 
     const client = getClient();
+    const systemPrompt = buildSystemPrompt(stats);
 
     for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
       const response = await client.messages.create({
         model: MODELS.SONNET,
         max_tokens: 4096,
-        system: buildSystemPrompt(stats),
+        system: systemPrompt,
         tools: COACH_TOOLS,
         messages: currentMessages,
       });
@@ -278,7 +339,7 @@ export async function POST(req: NextRequest) {
       const stream = client.messages.stream({
         model: MODELS.SONNET,
         max_tokens: 4096,
-        system: buildSystemPrompt(stats),
+        system: systemPrompt,
         tools: [],
         messages: currentMessages,
       });
@@ -342,4 +403,3 @@ export async function POST(req: NextRequest) {
     return new Response("Internal server error", { status: 500 });
   }
 }
-

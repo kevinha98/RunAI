@@ -460,6 +460,84 @@ export function computeMetrics(
   };
 }
 
+// ─── Personal Bests ──────────────────────────────────────────────────────────
+
+export interface PersonalBestEntry {
+  /** moving_time in seconds */
+  time: number;
+  /** ISO date string from start_date_local (falls back to start_date) */
+  date: string;
+}
+
+export interface PersonalBests {
+  /** Fastest run with distance within ±15% of 5 000 m (4 250–5 750 m) */
+  fiveKm: PersonalBestEntry | null;
+  /** Fastest run with distance within ±15% of 10 000 m (8 500–11 500 m) */
+  tenKm: PersonalBestEntry | null;
+  /** Distance of the longest single run in kilometres */
+  longestKm: number;
+}
+
+/**
+ * Computes personal bests from an array of Strava run activities.
+ *
+ * - fiveKm    : Fastest moving_time among runs with distance in [4 250 m, 5 750 m] (5 000 m ± 15%)
+ * - tenKm     : Fastest moving_time among runs with distance in [8 500 m, 11 500 m] (10 000 m ± 15%)
+ * - longestKm : Distance of the longest single run in kilometres
+ *
+ * @param runs - Array of StravaActivity representing runs
+ * @returns PersonalBests object
+ */
+export function computePersonalBests(runs: StravaActivity[]): PersonalBests {
+  const FIVE_KM = 5_000;
+  const TEN_KM = 10_000;
+  const TOLERANCE = 0.15;
+
+  const fiveKmLow  = FIVE_KM * (1 - TOLERANCE);  // 4 250
+  const fiveKmHigh = FIVE_KM * (1 + TOLERANCE);  // 5 750
+  const tenKmLow   = TEN_KM  * (1 - TOLERANCE);  // 8 500
+  const tenKmHigh  = TEN_KM  * (1 + TOLERANCE);  // 11 500
+
+  let fiveBest: PersonalBestEntry | null = null;
+  let tenBest: PersonalBestEntry | null = null;
+  let longestM = 0;
+
+  for (const run of runs) {
+    const dist = run.distance;
+    const time = run.moving_time;
+
+    if (!dist || dist <= 0 || !time || time <= 0) continue;
+
+    // Use start_date_local if available, fall back to start_date
+    const date = run.start_date_local ?? run.start_date ?? '';
+
+    // Longest run
+    if (dist > longestM) {
+      longestM = dist;
+    }
+
+    // 5 km PR — fastest (lowest moving_time)
+    if (dist >= fiveKmLow && dist <= fiveKmHigh) {
+      if (fiveBest === null || time < fiveBest.time) {
+        fiveBest = { time, date };
+      }
+    }
+
+    // 10 km PR — fastest (lowest moving_time)
+    if (dist >= tenKmLow && dist <= tenKmHigh) {
+      if (tenBest === null || time < tenBest.time) {
+        tenBest = { time, date };
+      }
+    }
+  }
+
+  return {
+    fiveKm: fiveBest,
+    tenKm: tenBest,
+    longestKm: Math.round((longestM / 1000) * 100) / 100,
+  };
+}
+
 // ─── Pure formatting helpers — safe for client components ───────────────────
 
 /** Convert seconds-per-km to "M:SS" string, e.g. 321 → "5:21" */
