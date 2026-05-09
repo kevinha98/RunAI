@@ -119,7 +119,7 @@ function getWeeklyActualKm(runs: StravaActivity[]): number {
     .reduce((sum, r) => sum + r.distance / 1000, 0);
 }
 
-function weeklyKmBuckets(runs: StravaActivity[], n = 8): { label: string; km: number }[] {
+function weeklyKmBuckets(runs: StravaActivity[], n = 8): { label: string; km: number; weekNum: string; }[] {
   const map: Record<string, number> = {};
   for (const r of runs) {
     const d = new Date(r.start_date_local);
@@ -131,7 +131,21 @@ function weeklyKmBuckets(runs: StravaActivity[], n = 8): { label: string; km: nu
   const sorted = Object.entries(map)
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-n);
-  return sorted.map(([key, km]) => ({ label: key.split("-W")[1] ?? key, km: Math.round(km * 10) / 10 }));
+  return sorted.map(([key, km]) => ({
+    label: key.split("-W")[1] ?? key,
+    km: Math.round(km * 10) / 10,
+    weekNum: key.split("-W")[1] ?? key,
+  }));
+}
+
+// Tooltip helpers
+function clampTooltipX(cx: number, tooltipW: number, svgW: number): number {
+  return Math.min(Math.max(cx - tooltipW / 2, 2), svgW - tooltipW - 2);
+}
+
+function clampTooltipY(cy: number, tooltipH: number, minY: number): number {
+  const above = cy - tooltipH - 8;
+  return above < minY ? cy + 12 : above;
 }
 
 // Charts
@@ -140,26 +154,109 @@ function BarChart({ data, color = STRAVA_ORANGE }: {
   data: { label: string; value: number }[];
   color?: string;
 }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const max = Math.max(...data.map((d) => d.value), 1);
-  const W = 320; const H = 80;
+  const W = 320;
+  const H = 80;
   const BAR_W = Math.floor((W - (data.length - 1) * 4) / data.length);
+  const TOOLTIP_W = 96;
+  const TOOLTIP_H = 44;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full" style={{ overflow: "visible" }}>
+    <svg
+      viewBox={`0 0 ${W} ${H + 20}`}
+      className="w-full"
+      style={{ overflow: "visible" }}
+      onMouseLeave={() => setHoveredIndex(null)}
+    >
       {data.map((d, i) => {
         const barH = Math.max(3, (d.value / max) * H);
         const x = i * (BAR_W + 4);
         const isLast = i === data.length - 1;
+        const isHovered = hoveredIndex === i;
+        const cx = x + BAR_W / 2;
+        const tx = clampTooltipX(cx, TOOLTIP_W, W);
+        const ty = clampTooltipY(H - barH, TOOLTIP_H, 0);
+
         return (
-          <g key={i}>
-            <rect x={x} y={H - barH} width={BAR_W} height={barH} rx={3}
-              fill={isLast ? color : `${color}55`} />
-            <text x={x + BAR_W / 2} y={H + 14} textAnchor="middle" fontSize={9} fill="#6B6B65">
+          <g
+            key={i}
+            onMouseEnter={() => setHoveredIndex(i)}
+            onMouseLeave={() => setHoveredIndex(null)}
+            style={{ cursor: "pointer" }}
+          >
+            {/* Invisible full-height hit area */}
+            <rect
+              x={x}
+              y={0}
+              width={BAR_W}
+              height={H}
+              fill="transparent"
+            />
+            <rect
+              x={x}
+              y={H - barH}
+              width={BAR_W}
+              height={barH}
+              rx={3}
+              fill={isHovered ? color : isLast ? color : `${color}55`}
+              opacity={isHovered ? 1 : 1}
+            />
+            <text
+              x={cx}
+              y={H + 14}
+              textAnchor="middle"
+              fontSize={9}
+              fill="#6B6B65"
+            >
               {d.label}
             </text>
-            {isLast && (
-              <text x={x + BAR_W / 2} y={H - barH - 4} textAnchor="middle" fontSize={9} fontWeight="bold" fill={color}>
+            {isLast && !isHovered && (
+              <text
+                x={cx}
+                y={H - barH - 4}
+                textAnchor="middle"
+                fontSize={9}
+                fontWeight="bold"
+                fill={color}
+              >
                 {d.value}
               </text>
+            )}
+            {isHovered && (
+              <g style={{ pointerEvents: "none" }}>
+                <rect
+                  x={tx}
+                  y={ty}
+                  width={TOOLTIP_W}
+                  height={TOOLTIP_H}
+                  rx={5}
+                  fill="white"
+                  stroke="#E5E5E2"
+                  strokeWidth={1}
+                  style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.10))" }}
+                />
+                <text
+                  x={tx + TOOLTIP_W / 2}
+                  y={ty + 14}
+                  textAnchor="middle"
+                  fontSize={8}
+                  fill="#6B6B65"
+                  fontWeight="600"
+                >
+                  Uke {d.label}
+                </text>
+                <text
+                  x={tx + TOOLTIP_W / 2}
+                  y={ty + 30}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fontWeight="bold"
+                  fill={STRAVA_ORANGE}
+                >
+                  {d.value} km
+                </text>
+              </g>
             )}
           </g>
         );
@@ -169,13 +266,17 @@ function BarChart({ data, color = STRAVA_ORANGE }: {
 }
 
 function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const last10 = runs.slice(0, 10).reverse().filter((r) => r.distance > 0 && r.moving_time > 0);
   if (last10.length < 2) return <p className="text-xs text-[#6B6B65]">Trenger minst 2 løp</p>;
 
   const paces = last10.map((r) => activityPaceSec(r));
   const maxP = Math.max(...paces);
   const range = maxP - Math.min(...paces) || 60;
-  const W = 280; const H = 60;
+  const W = 280;
+  const H = 60;
+  const TOOLTIP_W = 110;
+  const TOOLTIP_H = 52;
 
   const pts = paces.map((p, i) => ({
     x: (i / (paces.length - 1)) * W,
@@ -198,7 +299,12 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
           {trend < -5 ? "Farten forbedres" : trend > 5 ? "Farten synker" : "Stabil fart"} · siste {last10.length} løp
         </span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H + 24}`} className="w-full" style={{ overflow: "visible" }}>
+      <svg
+        viewBox={`0 0 ${W} ${H + 24}`}
+        className="w-full"
+        style={{ overflow: "visible" }}
+        onMouseLeave={() => setHoveredIndex(null)}
+      >
         <defs>
           <linearGradient id="paceGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={STRAVA_ORANGE} stopOpacity="0.18" />
@@ -206,19 +312,118 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
           </linearGradient>
         </defs>
         <path d={areaD} fill="url(#paceGrad)" />
-        <path d={pathD} stroke={STRAVA_ORANGE} strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-        {pts.map((p, i) => (
-          <g key={i}>
-            <circle cx={p.x} cy={p.y} r={3} fill="white" stroke={STRAVA_ORANGE} strokeWidth={1.5} />
-            <text x={p.x} y={H + 16} textAnchor="middle" fontSize={8} fill="#6B6B65">
-              {formatDate(last10[i].start_date_local).split(" ")[0]}
-            </text>
-          </g>
-        ))}
-        <text x={0} y={pts[0].y - 5} textAnchor="start" fontSize={8} fontWeight="bold" fill={STRAVA_ORANGE}>
+        <path
+          d={pathD}
+          stroke={STRAVA_ORANGE}
+          strokeWidth="2"
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {pts.map((p, i) => {
+          const isHovered = hoveredIndex === i;
+          const tx = clampTooltipX(p.x, TOOLTIP_W, W);
+          const ty = clampTooltipY(p.y, TOOLTIP_H, 0);
+          const dateLabel = formatDate(last10[i].start_date_local);
+          const paceLabel = formatPace(paces[i]);
+          const distKm = (last10[i].distance / 1000).toFixed(1);
+
+          return (
+            <g key={i}>
+              {/* Invisible hit area around point */}
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={10}
+                fill="transparent"
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                style={{ cursor: "pointer" }}
+              />
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={isHovered ? 4.5 : 3}
+                fill="white"
+                stroke={STRAVA_ORANGE}
+                strokeWidth={isHovered ? 2.5 : 1.5}
+                style={{ pointerEvents: "none", transition: "r 0.1s" }}
+              />
+              <text
+                x={p.x}
+                y={H + 16}
+                textAnchor="middle"
+                fontSize={8}
+                fill="#6B6B65"
+                style={{ pointerEvents: "none" }}
+              >
+                {dateLabel.split(" ")[0]}
+              </text>
+              {isHovered && (
+                <g style={{ pointerEvents: "none" }}>
+                  <rect
+                    x={tx}
+                    y={ty}
+                    width={TOOLTIP_W}
+                    height={TOOLTIP_H}
+                    rx={5}
+                    fill="white"
+                    stroke="#E5E5E2"
+                    strokeWidth={1}
+                    style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.10))" }}
+                  />
+                  <text
+                    x={tx + TOOLTIP_W / 2}
+                    y={ty + 14}
+                    textAnchor="middle"
+                    fontSize={8}
+                    fill="#6B6B65"
+                    fontWeight="600"
+                  >
+                    {dateLabel}
+                  </text>
+                  <text
+                    x={tx + TOOLTIP_W / 2}
+                    y={ty + 30}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fontWeight="bold"
+                    fill={STRAVA_ORANGE}
+                  >
+                    {paceLabel}/km
+                  </text>
+                  <text
+                    x={tx + TOOLTIP_W / 2}
+                    y={ty + 44}
+                    textAnchor="middle"
+                    fontSize={8}
+                    fill="#6B6B65"
+                  >
+                    {distKm} km
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+        <text
+          x={0}
+          y={pts[0].y - 5}
+          textAnchor="start"
+          fontSize={8}
+          fontWeight="bold"
+          fill={STRAVA_ORANGE}
+        >
           {formatPace(paces[0])}
         </text>
-        <text x={W} y={pts[pts.length - 1].y - 5} textAnchor="end" fontSize={8} fontWeight="bold" fill={STRAVA_ORANGE}>
+        <text
+          x={W}
+          y={pts[pts.length - 1].y - 5}
+          textAnchor="end"
+          fontSize={8}
+          fontWeight="bold"
+          fill={STRAVA_ORANGE}
+        >
           {formatPace(paces[paces.length - 1])}
         </text>
       </svg>
@@ -711,61 +916,41 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                     <span className={`text-sm font-semibold ${
                       d.done ? "text-[#C8C8C4] line-through" : "text-[#111110]"
                     }`}>
-                      {d.type}
+                      {d.icon} {d.type}
                     </span>
                     {d.today && (
-                      <span className="text-xs bg-[rgba(252,82,0,0.12)] text-[#FC5200] px-2 py-0.5 rounded-full font-bold">
-                        I dag
-                      </span>
+                      <span className="text-[10px] bg-[#FC5200] text-white px-1.5 py-0.5 rounded-full font-bold">I dag</span>
                     )}
-                    {d.done && !d.today && (
-                      <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-semibold">
-                        Fullført
-                      </span>
-                    )}
-                    {d.done && d.today && (
-                      <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-semibold">
-                        ✓
-                      </span>
+                    {d.done && (
+                      <span className="text-[10px] text-emerald-500 font-semibold">✓</span>
                     )}
                   </div>
-                  <span className="text-xs text-[#6B6B65]">{d.distance} · {d.pace}</span>
-                </div>
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#C8C8C4]"
-                }`}>
-                  {d.done && <span className="text-white text-xs">✓</span>}
+                  <div className="text-xs text-[#6B6B65]">{d.distance} · {d.pace}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* AI Coach */}
-        <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5 flex flex-col">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-[rgba(252,82,0,0.10)] rounded-xl flex items-center justify-center">
-              <Brain size={16} className="text-[#FC5200]" />
+        {/* Coach CTA */}
+        <div className="bg-gradient-to-br from-[rgba(252,82,0,0.08)] to-[rgba(252,82,0,0.03)] border border-[rgba(252,82,0,0.15)] rounded-2xl p-5 flex flex-col">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-[#FC5200] rounded-xl flex items-center justify-center">
+              <Brain size={16} className="text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-sm">AI-trener</h3>
-              <span className="text-xs text-[#FC5200] font-semibold">● Online</span>
+              <div className="font-bold text-sm">AI-trener</div>
+              <div className="text-xs text-[#6B6B65]">Personlig rådgiver</div>
             </div>
           </div>
-          <div className="flex-1 space-y-2.5 mb-4">
-            <div className="bg-[#F2F2F0] rounded-xl p-3 text-xs text-[#6B6B65] leading-relaxed">
-              &ldquo;Jeg analyserer treningsdataene dine og tilpasser planen løpende.&rdquo;
-            </div>
-            <div className="bg-[#F2F2F0] rounded-xl p-3 text-xs text-[#6B6B65] leading-relaxed">
-              &ldquo;Still meg om fart, skader, plan-justeringer eller hva som helst.&rdquo;
-            </div>
-          </div>
+          <p className="text-xs text-[#6B6B65] mb-4 flex-1">
+            Spør om treningsplanen, hva du bør fokusere på denne uken, eller få råd om skader og restitusjon.
+          </p>
           <Link
             href="/dashboard/coach"
-            className="flex items-center justify-center gap-2 w-full border border-[rgba(252,82,0,0.30)] text-[#FC5200] py-2.5 rounded-xl text-sm font-bold hover:bg-[rgba(252,82,0,0.04)] transition-colors"
+            className="flex items-center justify-center gap-2 bg-[#FC5200] text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-[#E04800] transition-colors"
           >
-            <MessageCircle size={14} />
-            Chat med trener
+            <MessageCircle size={14} /> Chat med trener
           </Link>
         </div>
       </div>
