@@ -123,6 +123,186 @@ export function computePaceZoneDistribution(
   }));
 }
 
+// ─── HR Zone Types ───────────────────────────────────────────────────────────
+
+export type HRZoneLabel =
+  | 'Z1 Restitusjon'
+  | 'Z2 Aerob'
+  | 'Z3 Tempo'
+  | 'Z4 Terskel'
+  | 'Z5 Maks';
+
+export interface HRZone {
+  label: HRZoneLabel;
+  description: string;
+  /** Lower bound as % of maxHR (inclusive) */
+  minPct: number;
+  /** Upper bound as % of maxHR (exclusive, except Z5 which is open-ended) */
+  maxPct: number;
+  bgClass: string;
+  textClass: string;
+  borderClass: string;
+  dotClass: string;
+  barClass: string;
+}
+
+export interface HRZoneDistribution {
+  zone: HRZone;
+  count: number;
+  percentage: number;
+}
+
+// ─── HR Zone Config ───────────────────────────────────────────────────────────
+
+/**
+ * Default max HR using 220-age formula, standardised to age 35 if unknown.
+ * 220 - 35 = 185 bpm
+ */
+export const DEFAULT_MAX_HR = 185;
+
+/**
+ * Standard 5-zone HR model based on % of max heart rate.
+ *
+ * Z1 Restitusjon : <60%  — Active recovery
+ * Z2 Aerob       : 60-70% — Aerobic base building
+ * Z3 Tempo       : 70-80% — Tempo / endurance
+ * Z4 Terskel     : 80-90% — Lactate threshold
+ * Z5 Maks        : >90%  — VO2max / max effort
+ */
+const HR_ZONES: Record<HRZoneLabel, HRZone> = {
+  'Z1 Restitusjon': {
+    label: 'Z1 Restitusjon',
+    description: 'Aktiv restitusjon',
+    minPct: 0,
+    maxPct: 60,
+    bgClass: 'bg-sky-100',
+    textClass: 'text-sky-800',
+    borderClass: 'border-sky-300',
+    dotClass: 'bg-sky-400',
+    barClass: 'bg-sky-400',
+  },
+  'Z2 Aerob': {
+    label: 'Z2 Aerob',
+    description: 'Aerob base',
+    minPct: 60,
+    maxPct: 70,
+    bgClass: 'bg-green-100',
+    textClass: 'text-green-800',
+    borderClass: 'border-green-300',
+    dotClass: 'bg-green-500',
+    barClass: 'bg-green-500',
+  },
+  'Z3 Tempo': {
+    label: 'Z3 Tempo',
+    description: 'Tempoutholdenhet',
+    minPct: 70,
+    maxPct: 80,
+    bgClass: 'bg-yellow-100',
+    textClass: 'text-yellow-800',
+    borderClass: 'border-yellow-300',
+    dotClass: 'bg-yellow-500',
+    barClass: 'bg-yellow-500',
+  },
+  'Z4 Terskel': {
+    label: 'Z4 Terskel',
+    description: 'Laktatterskelen',
+    minPct: 80,
+    maxPct: 90,
+    bgClass: 'bg-orange-100',
+    textClass: 'text-orange-800',
+    borderClass: 'border-orange-300',
+    dotClass: 'bg-orange-500',
+    barClass: 'bg-orange-500',
+  },
+  'Z5 Maks': {
+    label: 'Z5 Maks',
+    description: 'VO2max / Maks innsats',
+    minPct: 90,
+    maxPct: Infinity,
+    bgClass: 'bg-red-100',
+    textClass: 'text-red-800',
+    borderClass: 'border-red-300',
+    dotClass: 'bg-red-500',
+    barClass: 'bg-red-500',
+  },
+};
+
+/** Ordered zone labels from easiest to hardest */
+const HR_ZONE_ORDER: HRZoneLabel[] = [
+  'Z1 Restitusjon',
+  'Z2 Aerob',
+  'Z3 Tempo',
+  'Z4 Terskel',
+  'Z5 Maks',
+];
+
+/**
+ * Classify a single heart rate value into an HR zone.
+ *
+ * @param bpm   - Heart rate in beats per minute
+ * @param maxHR - Athlete's maximum heart rate (default: 185 = 220 - 35)
+ * @returns HRZone object with label and Tailwind classes
+ */
+export function classifyHeartRateZone(
+  bpm: number,
+  maxHR: number = DEFAULT_MAX_HR
+): HRZone {
+  if (!bpm || bpm <= 0 || !maxHR || maxHR <= 0) {
+    return HR_ZONES['Z2 Aerob'];
+  }
+
+  const pct = (bpm / maxHR) * 100;
+
+  if (pct < 60) return HR_ZONES['Z1 Restitusjon'];
+  if (pct < 70) return HR_ZONES['Z2 Aerob'];
+  if (pct < 80) return HR_ZONES['Z3 Tempo'];
+  if (pct < 90) return HR_ZONES['Z4 Terskel'];
+  return HR_ZONES['Z5 Maks'];
+}
+
+/**
+ * Computes distribution of HR zones for the last N runs.
+ *
+ * Only includes runs that have a valid average_heartrate value.
+ * Runs without HR data are excluded from the total count.
+ *
+ * @param runs   - Array of StravaActivity (recent runs)
+ * @param maxHR  - Athlete's maximum heart rate (default: 185 = 220 - 35)
+ * @param limit  - How many recent runs to consider (default 10)
+ * @returns Array of HRZoneDistribution sorted Z1 → Z5
+ */
+export function computeHeartRateZoneDistribution(
+  runs: StravaActivity[],
+  maxHR: number = DEFAULT_MAX_HR,
+  limit = 10
+): HRZoneDistribution[] {
+  const counts: Record<HRZoneLabel, number> = {
+    'Z1 Restitusjon': 0,
+    'Z2 Aerob': 0,
+    'Z3 Tempo': 0,
+    'Z4 Terskel': 0,
+    'Z5 Maks': 0,
+  };
+
+  const recent = runs.slice(0, limit);
+
+  // Only count runs with valid HR data
+  let total = 0;
+  for (const run of recent) {
+    const hr = run.average_heartrate;
+    if (!hr || hr <= 0) continue;
+    const zone = classifyHeartRateZone(hr, maxHR);
+    counts[zone.label] += 1;
+    total += 1;
+  }
+
+  return HR_ZONE_ORDER.map((label) => ({
+    zone: HR_ZONES[label],
+    count: counts[label],
+    percentage: total > 0 ? Math.round((counts[label] / total) * 100) : 0,
+  }));
+}
+
 // ─── Computed Metrics ────────────────────────────────────────────────────────
 
 /**
