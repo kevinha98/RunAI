@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -294,44 +294,69 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
   const hasData = athlete !== null;
   const athleteName = athlete?.firstname ?? null;
 
-  const runsWithPace = recentRuns.filter((r) => r.distance > 0 && r.moving_time > 0);
+  const runsWithPace = useMemo(
+    () => recentRuns.filter((r) => r.distance > 0 && r.moving_time > 0),
+    [recentRuns]
+  );
 
-  const bestPace = runsWithPace.length > 0
-    ? Math.min(...runsWithPace.map((r) => activityPaceSec(r)))
-    : 0;
+  const bestPace = useMemo(() => {
+    if (!runsWithPace.length) return 0;
+    return Math.min(...runsWithPace.map((r) => activityPaceSec(r)));
+  }, [runsWithPace]);
 
-  const runsWithHR = runsWithPace.filter((r) => r.average_heartrate);
-  const avgHR = runsWithHR.length > 0
-    ? Math.round(runsWithHR.reduce((s, r) => s + (r.average_heartrate ?? 0), 0) / runsWithHR.length)
-    : null;
+  const avgHR = useMemo(() => {
+    const runsWithHR = runsWithPace.filter((r) => r.average_heartrate);
+    if (!runsWithHR.length) return null;
+    return Math.round(
+      runsWithHR.reduce((s, r) => s + (r.average_heartrate ?? 0), 0) / runsWithHR.length
+    );
+  }, [runsWithPace]);
 
-  const now = new Date();
-  const totalElevationMonth = recentRuns
-    .filter((r) => {
-      const d = new Date(r.start_date_local);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    })
-    .reduce((s, r) => s + (r.total_elevation_gain ?? 0), 0);
+  const totalElevationMonth = useMemo(() => {
+    const now = new Date();
+    return recentRuns
+      .filter((r) => {
+        const d = new Date(r.start_date_local);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((s, r) => s + (r.total_elevation_gain ?? 0), 0);
+  }, [recentRuns]);
 
-  const avgSpeedKmh = runsWithPace.length > 0
-    ? runsWithPace.reduce((s, r) => s + (r.average_speed ?? 0), 0) / runsWithPace.length * 3.6
-    : 0;
+  const avgSpeedKmh = useMemo(() => {
+    if (!runsWithPace.length) return 0;
+    return runsWithPace.reduce((s, r) => s + (r.average_speed ?? 0), 0) / runsWithPace.length * 3.6;
+  }, [runsWithPace]);
 
-  const weeklyBuckets = weeklyKmBuckets(recentRuns, 8);
+  const weeklyBuckets = useMemo(
+    () => weeklyKmBuckets(recentRuns, 8),
+    [recentRuns]
+  );
+
   const recentRunCount = stravaStats?.recent_run_totals?.count ?? 0;
   const ytdElevation = Math.round(
     ((stravaStats?.ytd_run_totals as { elevation_gain?: number } | null)?.elevation_gain) ?? 0
   );
 
-  const avgRunDistKm = runsWithPace.length > 0
-    ? runsWithPace.reduce((s, r) => s + r.distance / 1000, 0) / runsWithPace.length
-    : 0;
+  const avgRunDistKm = useMemo(() => {
+    if (!runsWithPace.length) return 0;
+    return runsWithPace.reduce((s, r) => s + r.distance / 1000, 0) / runsWithPace.length;
+  }, [runsWithPace]);
 
-  const last5 = runsWithPace.slice(0, 5);
-  const prev5 = runsWithPace.slice(5, 10);
-  const last5Pace = last5.length ? last5.reduce((s, r) => s + activityPaceSec(r), 0) / last5.length : 0;
-  const prev5Pace = prev5.length ? prev5.reduce((s, r) => s + activityPaceSec(r), 0) / prev5.length : 0;
-  const paceDelta = prev5Pace > 0 ? prev5Pace - last5Pace : 0;
+  const { last5Pace, prev5Pace, paceDelta } = useMemo(() => {
+    const last5 = runsWithPace.slice(0, 5);
+    const prev5 = runsWithPace.slice(5, 10);
+    const last5PaceSec = last5.length
+      ? last5.reduce((s, r) => s + activityPaceSec(r), 0) / last5.length
+      : 0;
+    const prev5PaceSec = prev5.length
+      ? prev5.reduce((s, r) => s + activityPaceSec(r), 0) / prev5.length
+      : 0;
+    const delta = prev5PaceSec > 0 ? prev5PaceSec - last5PaceSec : 0;
+    return { last5Pace: last5PaceSec, prev5Pace: prev5PaceSec, paceDelta: delta };
+  }, [runsWithPace]);
+
+  // suppress unused var warning — prev5Pace kept for potential future use
+  void prev5Pace;
 
   return (
     <div className="flex-1 md:ml-60 p-4 md:p-8 pb-24 md:pb-8 min-w-0">
