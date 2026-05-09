@@ -10,3 +10,5 @@ dist
 
 # Strava stats store (personal data — not for version control)
 apps/web/data/
+
+autonomous/
