@@ -290,7 +290,22 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
           <h1 className="text-2xl font-black tracking-tight">
             {athleteName ? `God dag, ${athleteName} 👋` : "God dag 👋"}
           </h1>
-          <p className="text-[#6B6B65] text-sm mt-1">{daysUntilRace} dager til løpsdagen · Bergen City Marathon</p>
+          {/* Marathon progress indicator */}
+          {(() => {
+            const planStart = new Date(2026, 4, 5).getTime();
+            const raceEnd = new Date(2027, 3, 24).getTime();
+            const now2 = Date.now();
+            const pct = Math.min(100, Math.max(0, ((now2 - planStart) / (raceEnd - planStart)) * 100));
+            const phase = WEEKS.find((w) => w.week === getCurrentWeek())?.phase ?? "Grunntrening";
+            return (
+              <div className="mt-1.5">
+                <p className="text-[#6B6B65] text-sm">{daysUntilRace} dager igjen · <span className="font-medium text-[#111110]">{phase}</span> · Bergen City Marathon</p>
+                <div className="mt-1 h-1.5 w-48 bg-[#F0F0EE] rounded-full overflow-hidden">
+                  <div className="h-full bg-[#FC5200] rounded-full transition-all" style={{ width: `${pct.toFixed(1)}%` }} />
+                </div>
+              </div>
+            );
+          })()}
         </div>
         <Link
           href="/dashboard/coach"
