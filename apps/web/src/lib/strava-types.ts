@@ -152,6 +152,17 @@ export interface HRZoneDistribution {
   percentage: number;
 }
 
+// ─── HR Zone Distribution Entry (for stacked bar chart) ──────────────────────
+
+export interface HRZoneDistributionEntry {
+  zone: HRZone;
+  label: HRZoneLabel;
+  /** Total minutes spent in this zone across all qualifying runs */
+  minutes: number;
+  /** Percentage of total HR-tracked minutes in this zone (0–100) */
+  pct: number;
+}
+
 // ─── HR Zone Config ───────────────────────────────────────────────────────────
 
 /**
@@ -261,22 +272,23 @@ export function classifyHeartRateZone(
 }
 
 /**
- * Computes distribution of HR zones for the last N runs.
+ * Computes HR zone distribution (minutes and percentage) for a list of runs.
  *
- * Only includes runs that have a valid average_heartrate value.
- * Runs without HR data are excluded from the total count.
+ * Each run is classified into one of 5 Garmin HR zones based on its
+ * average_heartrate relative to maxHR. The run's moving_time (seconds)
+ * is attributed entirely to that zone.
  *
- * @param runs   - Array of StravaActivity (recent runs)
- * @param maxHR  - Athlete's maximum heart rate (default: 185 = 220 - 35)
- * @param limit  - How many recent runs to consider (default 10)
- * @returns Array of HRZoneDistribution sorted Z1 → Z5
+ * Only runs with a valid average_heartrate and positive moving_time are included.
+ *
+ * @param runs  - Array of StravaActivity
+ * @param maxHR - Athlete's max heart rate (default: DEFAULT_MAX_HR = 185)
+ * @returns Array of HRZoneDistributionEntry ordered Z1 → Z5
  */
 export function computeHeartRateZoneDistribution(
   runs: StravaActivity[],
-  maxHR: number = DEFAULT_MAX_HR,
-  limit = 10
-): HRZoneDistribution[] {
-  const counts: Record<HRZoneLabel, number> = {
+  maxHR: number = DEFAULT_MAX_HR
+): HRZoneDistributionEntry[] {
+  const minutesPerZone: Record<HRZoneLabel, number> = {
     'Z1 Restitusjon': 0,
     'Z2 Aerob': 0,
     'Z3 Tempo': 0,
@@ -284,23 +296,34 @@ export function computeHeartRateZoneDistribution(
     'Z5 Maks': 0,
   };
 
-  const recent = runs.slice(0, limit);
+  let totalMinutes = 0;
 
-  // Only count runs with valid HR data
-  let total = 0;
-  for (const run of recent) {
+  for (const run of runs) {
     const hr = run.average_heartrate;
     if (!hr || hr <= 0) continue;
+
+    const movingMinutes = run.moving_time > 0 ? run.moving_time / 60 : 0;
+    if (movingMinutes <= 0) continue;
+
     const zone = classifyHeartRateZone(hr, maxHR);
-    counts[zone.label] += 1;
-    total += 1;
+    minutesPerZone[zone.label] += movingMinutes;
+    totalMinutes += movingMinutes;
   }
 
-  return HR_ZONE_ORDER.map((label) => ({
-    zone: HR_ZONES[label],
-    count: counts[label],
-    percentage: total > 0 ? Math.round((counts[label] / total) * 100) : 0,
-  }));
+  return HR_ZONE_ORDER.map((label) => {
+    const rawMinutes = minutesPerZone[label];
+    const minutes = Math.round(rawMinutes);
+    const pct =
+      totalMinutes > 0
+        ? Math.round((rawMinutes / totalMinutes) * 100)
+        : 0;
+    return {
+      zone: HR_ZONES[label],
+      label,
+      minutes,
+      pct,
+    };
+  });
 }
 
 // ─── Training Load Types ─────────────────────────────────────────────────────
