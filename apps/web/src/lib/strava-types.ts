@@ -303,6 +303,63 @@ export function computeHeartRateZoneDistribution(
   }));
 }
 
+// ─── Training Load Types ─────────────────────────────────────────────────────
+
+export interface TrainingLoad {
+  /** Acute Training Load: total km run in the last 7 days */
+  atl: number;
+  /** Chronic Training Load: average weekly km over the last 28 days (total km / 4 weeks) */
+  ctl: number;
+  /** Training Stress Balance: ctl - atl (positive = fresh/good form, negative = fatigued) */
+  tsb: number;
+}
+
+/**
+ * Computes Acute Training Load (ATL), Chronic Training Load (CTL),
+ * and Training Stress Balance (TSB) from recent runs.
+ *
+ * - ATL = total km run in the last 7 days
+ * - CTL = average weekly km over the last 28 days (total km in 28d / 4 weeks)
+ * - TSB = CTL - ATL  (positive → fresh/good form, negative → fatigued/overloaded)
+ *
+ * @param runs - Array of StravaActivity (should include runs from at least last 28 days)
+ * @returns TrainingLoad object with atl, ctl, tsb rounded to 1 decimal
+ */
+export function computeTrainingLoad(runs: StravaActivity[]): TrainingLoad {
+  const now = Date.now();
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const cutoff7  = now - 7  * MS_PER_DAY;
+  const cutoff28 = now - 28 * MS_PER_DAY;
+
+  let kmLast7  = 0;
+  let kmLast28 = 0;
+
+  for (const run of runs) {
+    if (!run.start_date) continue;
+
+    const runTime = new Date(run.start_date).getTime();
+    if (isNaN(runTime)) continue;
+
+    // Skip future activities
+    if (runTime > now) continue;
+
+    const distanceKm = (run.distance ?? 0) / 1000;
+
+    if (runTime >= cutoff28) {
+      kmLast28 += distanceKm;
+    }
+    if (runTime >= cutoff7) {
+      kmLast7 += distanceKm;
+    }
+  }
+
+  const atl = Math.round(kmLast7 * 10) / 10;
+  const ctl = Math.round((kmLast28 / 4) * 10) / 10;
+  const tsb = Math.round((ctl - atl) * 10) / 10;
+
+  return { atl, ctl, tsb };
+}
+
 // ─── Computed Metrics ────────────────────────────────────────────────────────
 
 /**
