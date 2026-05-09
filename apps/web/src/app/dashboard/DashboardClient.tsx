@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Brain,
@@ -17,20 +18,20 @@ import {
 } from "lucide-react";
 import type { StoredStats, StravaActivity } from "@/lib/strava-types";
 import { formatPace } from "@/lib/strava-types";
+import { getCurrentWeek, WEEKS } from "@/lib/plan-data";
 
 const STRAVA_ORANGE = "#FC5200";
 const RACE_DATE = "2027-04-24";
 
-const PLAN_SESSIONS = [
-  { day: "Man", dayIdx: 1, type: "Lett løping", distance: "8 km", pace: "5:45/km" },
-  { day: "Tir", dayIdx: 2, type: "Styrke", distance: "45 min", pace: "Løpeøvelser" },
-  { day: "Ons", dayIdx: 3, type: "Terskelløkt", distance: "10 km", pace: "4:50/km" },
-  { day: "Tor", dayIdx: 4, type: "Hvile", distance: "—", pace: "Restitusjon" },
-  { day: "Fre", dayIdx: 5, type: "Lett løping", distance: "6 km", pace: "5:50/km" },
-  { day: "Lør", dayIdx: 6, type: "Langkjøring", distance: "18 km", pace: "6:00/km" },
-  { day: "Søn", dayIdx: 0, type: "Hvile", distance: "—", pace: "Restitusjon" },
-];
+// Map Norwegian day abbreviations to JS getDay() index (0=Sun)
+const DAY_IDX: Record<string, number> = {
+  Man: 1, Tir: 2, Ons: 3, Tor: 4, Fre: 5, Lør: 6, Søn: 0,
+};
 
+function getPlanSessions() {
+  const weekData = WEEKS.find((w) => w.week === getCurrentWeek()) ?? WEEKS[0];
+  return weekData.sessions.map((s) => ({ ...s, dayIdx: DAY_IDX[s.day] ?? 0 }));
+}
 // Helpers
 
 function metersToKm(m: number) { return (m / 1000).toFixed(1); }
@@ -197,9 +198,19 @@ function StravaIcon() {
 
 interface Props { stravaData: StoredStats; stravaStatus?: string | null; }
 
-export default function DashboardClient({ stravaData, stravaStatus: _stravaStatus }: Props) {
+export default function DashboardClient({ stravaData, stravaStatus }: Props) {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const handleSync = useCallback(async () => {
+    setIsSyncing(true);
+    try { await fetch("/api/strava/sync", { method: "POST" }); } finally { setIsSyncing(false); }
+  }, []);
+
+  const minutesSinceSync = stravaData.lastSync
+    ? Math.round((Date.now() - new Date(stravaData.lastSync).getTime()) / 60000)
+    : null;
+
   const todayIdx = new Date().getDay();
-  const thisWeek = PLAN_SESSIONS.map((d) => ({
+  const thisWeek = getPlanSessions().map((d) => ({
     ...d,
     today: d.dayIdx === todayIdx,
     done: todayIdx === 0 ? d.dayIdx !== 0 : d.dayIdx > 0 && d.dayIdx < todayIdx,
@@ -252,6 +263,13 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
 
   return (
     <div className="flex-1 md:ml-60 p-4 md:p-8 pb-24 md:pb-8 min-w-0">
+      {/* Strava feilvarsel */}
+      {stravaStatus && ["token_expired", "fetch_error", "error"].includes(stravaStatus) && (
+        <div className="mb-4 flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-sm">
+          <span className="text-orange-800">Strava-tilkoblingen er utløpt eller har feil. Data kan være utdatert.</span>
+          <Link href="/api/strava/connect" className="ml-4 text-[#FC5200] font-semibold hover:underline whitespace-nowrap">Koble til på nytt</Link>
+        </div>
+      )}
       {/* Mobile top bar */}
       <div className="flex md:hidden items-center justify-between mb-5">
         <div className="flex items-center gap-2">
@@ -431,10 +449,22 @@ export default function DashboardClient({ stravaData, stravaStatus: _stravaStatu
                 <div className="flex items-center gap-2">
                   <StravaIcon />
                   <h3 className="font-bold text-sm">Siste løp</h3>
+                  {minutesSinceSync !== null && (
+                    <span className="text-[10px] text-[#6B6B65]">· oppdatert {minutesSinceSync < 60 ? `${minutesSinceSync} min` : `${Math.floor(minutesSinceSync / 60)}t`} siden</span>
+                  )}
                 </div>
-                <Link href="/dashboard/progress" className="text-xs text-[#FC5200] flex items-center gap-1 hover:underline font-semibold">
-                  Se fremgang <ChevronRight size={12} />
-                </Link>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSync}
+                    disabled={isSyncing}
+                    className="text-xs text-[#FC5200] font-semibold hover:underline disabled:opacity-40"
+                  >
+                    {isSyncing ? "Oppdaterer…" : "Synk"}
+                  </button>
+                  <Link href="/dashboard/progress" className="text-xs text-[#FC5200] flex items-center gap-1 hover:underline font-semibold">
+                    Se fremgang <ChevronRight size={12} />
+                  </Link>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
