@@ -29,9 +29,58 @@ const DAY_IDX: Record<string, number> = {
   Man: 1, Tir: 2, Ons: 3, Tor: 4, Fre: 5, Lør: 6, Søn: 0,
 };
 
-function getPlanSessions() {
+/**
+ * Returns the Monday 00:00:00 local time for the week containing `date`.
+ */
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diffToMonday);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Returns the Sunday 23:59:59.999 local time for the week containing `date`.
+ */
+function getWeekEnd(date: Date): Date {
+  const start = getWeekStart(date);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+/**
+ * Checks whether a planned session (identified by its Norwegian day abbreviation)
+ * has a matching Strava activity on the same weekday in the current week.
+ */
+function isSessionDone(sessionDay: string, recentRuns: StravaActivity[]): boolean {
+  const targetDayIdx = DAY_IDX[sessionDay];
+  if (targetDayIdx === undefined) return false;
+
+  const now = new Date();
+  const weekStart = getWeekStart(now);
+  const weekEnd = getWeekEnd(now);
+
+  return recentRuns.some((run) => {
+    const runDate = new Date(run.start_date_local);
+    return (
+      runDate >= weekStart &&
+      runDate <= weekEnd &&
+      runDate.getDay() === targetDayIdx
+    );
+  });
+}
+
+function getPlanSessions(recentRuns: StravaActivity[]) {
   const weekData = WEEKS.find((w) => w.week === getCurrentWeek()) ?? WEEKS[0];
-  return weekData.sessions.map((s) => ({ ...s, dayIdx: DAY_IDX[s.day] ?? 0 }));
+  return weekData.sessions.map((s) => ({
+    ...s,
+    dayIdx: DAY_IDX[s.day] ?? 0,
+    done: isSessionDone(s.day, recentRuns),
+  }));
 }
 
 // Helpers
@@ -64,11 +113,7 @@ function getWeeklyPlanKm(): number {
 
 function getWeeklyActualKm(runs: StravaActivity[]): number {
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun
-  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMonday);
-  monday.setHours(0, 0, 0, 0);
+  const monday = getWeekStart(now);
   return runs
     .filter((r) => new Date(r.start_date_local) >= monday)
     .reduce((sum, r) => sum + r.distance / 1000, 0);
@@ -281,18 +326,24 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
     ? Math.round((Date.now() - new Date(stravaData.lastSync).getTime()) / 60000)
     : null;
 
-  const todayIdx = new Date().getDay();
-  const thisWeek = getPlanSessions().map((d) => ({
-    ...d,
-    today: d.dayIdx === todayIdx,
-    done: todayIdx === 0 ? d.dayIdx !== 0 : d.dayIdx > 0 && d.dayIdx < todayIdx,
-  }));
-  const today = thisWeek.find((d) => d.today);
-  const daysUntilRace = Math.ceil((new Date(RACE_DATE).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-
   const { computed, athlete, recentRuns, stravaStats } = stravaData;
   const hasData = athlete !== null;
   const athleteName = athlete?.firstname ?? null;
+
+  const todayIdx = new Date().getDay();
+
+  // Build weekly plan sessions with done-state based on Strava activities
+  const thisWeek = useMemo(
+    () =>
+      getPlanSessions(recentRuns).map((d) => ({
+        ...d,
+        today: d.dayIdx === todayIdx,
+      })),
+    [recentRuns, todayIdx]
+  );
+
+  const today = thisWeek.find((d) => d.today);
+  const daysUntilRace = Math.ceil((new Date(RACE_DATE).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
   const runsWithPace = useMemo(
     () => recentRuns.filter((r) => r.distance > 0 && r.moving_time > 0),
@@ -357,6 +408,7 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
 
   // suppress unused var warning — prev5Pace kept for potential future use
   void prev5Pace;
+  void last5Pace;
 
   return (
     <div className="flex-1 md:ml-60 p-4 md:p-8 pb-24 md:pb-8 min-w-0">
@@ -656,7 +708,9 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                 <span className="text-xs font-bold text-[#6B6B65] w-7">{d.day}</span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-semibold ${d.done ? "text-[#C8C8C4] line-through" : "text-[#111110]"}`}>
+                    <span className={`text-sm font-semibold ${
+                      d.done ? "text-[#C8C8C4] line-through" : "text-[#111110]"
+                    }`}>
                       {d.type}
                     </span>
                     {d.today && (
@@ -664,10 +718,22 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                         I dag
                       </span>
                     )}
+                    {d.done && !d.today && (
+                      <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-semibold">
+                        Fullført
+                      </span>
+                    )}
+                    {d.done && d.today && (
+                      <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-semibold">
+                        ✓
+                      </span>
+                    )}
                   </div>
                   <span className="text-xs text-[#6B6B65]">{d.distance} · {d.pace}</span>
                 </div>
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#C8C8C4]"}`}>
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  d.done ? "bg-[#FC5200] border-[#FC5200]" : "border-[#C8C8C4]"
+                }`}>
                   {d.done && <span className="text-white text-xs">✓</span>}
                 </div>
               </div>
@@ -696,10 +762,10 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
           </div>
           <Link
             href="/dashboard/coach"
-            className="flex items-center justify-center gap-2 w-full border border-[rgba(252,82,0,0.30)] text-[#FC5200] py-2.5 rounded-xl text-sm font-bold hover:bg-[rgba(252,82,0,0.08)] transition-colors"
+            className="flex items-center justify-center gap-2 w-full border border-[rgba(252,82,0,0.30)] text-[#FC5200] py-2.5 rounded-xl text-sm font-bold hover:bg-[rgba(252,82,0,0.04)] transition-colors"
           >
             <MessageCircle size={14} />
-            Chat med treneren
+            Chat med trener
           </Link>
         </div>
       </div>
