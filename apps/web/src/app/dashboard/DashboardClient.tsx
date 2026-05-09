@@ -18,7 +18,7 @@ import {
   BarChart2,
 } from "lucide-react";
 import type { StoredStats, StravaActivity } from "@/lib/strava-types";
-import { formatPace } from "@/lib/strava-types";
+import { formatPace, computePaceZoneDistribution } from "@/lib/strava-types";
 import { getCurrentWeek, WEEKS } from "@/lib/plan-data";
 
 const STRAVA_ORANGE = "#FC5200";
@@ -431,6 +431,110 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
   );
 }
 
+function ZoneDistributionChart({ runs, avgPaceSecPerKm }: { runs: StravaActivity[]; avgPaceSecPerKm: number }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const distribution = useMemo(
+    () => computePaceZoneDistribution(runs, avgPaceSecPerKm, 20),
+    [runs, avgPaceSecPerKm]
+  );
+
+  const totalCount = useMemo(
+    () => distribution.reduce((sum, z) => sum + z.count, 0),
+    [distribution]
+  );
+
+  const hasData = totalCount > 0;
+
+  if (!hasData) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-sm">Fartsone-fordeling</h3>
+          <span className="text-xs text-[#6B6B65]">Siste 20 løp</span>
+        </div>
+        <p className="text-xs text-[#6B6B65]">Trenger flere løp med data</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-sm">Fartsone-fordeling</h3>
+        <span className="text-xs text-[#6B6B65]">Siste 20 løp</span>
+      </div>
+
+      {/* Stacked bar */}
+      <div className="flex h-8 w-full rounded-lg overflow-hidden gap-px mb-4">
+        {distribution.map((z, i) => {
+          if (z.percentage === 0) return null;
+          return (
+            <div
+              key={z.zone.label}
+              className={`${z.zone.bgClass} relative flex items-center justify-center cursor-pointer transition-opacity duration-150`}
+              style={{
+                width: `${z.percentage}%`,
+                opacity: hoveredIndex === null || hoveredIndex === i ? 1 : 0.4,
+              }}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              title={`${z.zone.label}: ${z.percentage}%`}
+            >
+              {z.percentage >= 10 && (
+                <span className="text-[10px] font-bold text-white drop-shadow-sm select-none">
+                  {z.percentage}%
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+        {distribution.map((z, i) => (
+          <div
+            key={z.zone.label}
+            className="flex items-center gap-2 cursor-pointer"
+            style={{
+              opacity: hoveredIndex === null || hoveredIndex === i ? 1 : 0.4,
+            }}
+            onMouseEnter={() => setHoveredIndex(i)}
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            <span className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${z.zone.bgClass}`} />
+            <span className={`text-xs font-medium ${z.zone.textClass}`}>
+              {z.zone.label}
+            </span>
+            <span className="text-xs text-[#6B6B65] ml-auto">
+              {z.percentage}%
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Hover detail */}
+      {hoveredIndex !== null && distribution[hoveredIndex] && (
+        <div className="mt-3 pt-3 border-t border-[#F0F0EE]">
+          <div className="flex items-center justify-between">
+            <span className={`text-xs font-semibold ${distribution[hoveredIndex].zone.textClass}`}>
+              {distribution[hoveredIndex].zone.label}
+            </span>
+            <span className="text-xs text-[#6B6B65]">
+              {distribution[hoveredIndex].count} av {totalCount} løp
+            </span>
+          </div>
+        </div>
+      )}
+
+      <p className="text-[10px] text-[#6B6B65] mt-auto pt-3">
+        Basert på {Math.min(runs.length, 20)} løp
+      </p>
+    </div>
+  );
+}
+
 // Sub-components
 
 function StatCard({ icon, label, value, unit, sub, subColor = "text-[#6B6B65]" }: {
@@ -790,8 +894,8 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
             />
           </div>
 
-          {/* Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+          {/* Charts — row 1: Ukentlig volum + Fartsutvikling */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4">
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-sm">Ukentlig volum</h3>
@@ -813,6 +917,16 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
             </div>
           </div>
 
+          {/* Charts — row 2: Fartsone-fordeling */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
+              <ZoneDistributionChart
+                runs={recentRuns}
+                avgPaceSecPerKm={computed.avgPaceSecPerKm}
+              />
+            </div>
+          </div>
+
           {/* Run table */}
           {recentRuns.length > 0 && (
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5 mb-6">
@@ -820,57 +934,42 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
                 <div className="flex items-center gap-2">
                   <StravaIcon />
                   <h3 className="font-bold text-sm">Siste løp</h3>
-                  {minutesSinceSync !== null && (
-                    <span className="text-[10px] text-[#6B6B65]">· oppdatert {minutesSinceSync < 60 ? `${minutesSinceSync} min` : `${Math.floor(minutesSinceSync / 60)}t`} siden</span>
-                  )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleSync}
-                    disabled={isSyncing}
-                    className="text-xs text-[#FC5200] font-semibold hover:underline disabled:opacity-40"
-                  >
-                    {isSyncing ? "Oppdaterer…" : "Synk"}
-                  </button>
-                  <Link href="/dashboard/progress" className="text-xs text-[#FC5200] flex items-center gap-1 hover:underline font-semibold">
-                    Se fremgang <ChevronRight size={12} />
-                  </Link>
-                </div>
+                <button
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="flex items-center gap-1.5 text-xs text-[#6B6B65] hover:text-[#FC5200] transition-colors disabled:opacity-50"
+                >
+                  <Activity size={12} className={isSyncing ? "animate-spin" : ""} />
+                  {isSyncing ? "Synkroniserer..." : minutesSinceSync !== null ? `Oppdatert ${minutesSinceSync}m siden` : "Synkroniser"}
+                </button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-[#6B6B65] border-b border-[#F0F0EE]">
-                      <th className="text-left pb-2 font-semibold pr-3">Dato</th>
-                      <th className="text-left pb-2 font-semibold pr-3">Navn</th>
-                      <th className="text-right pb-2 font-semibold pr-3">Dist</th>
-                      <th className="text-right pb-2 font-semibold pr-3">Fart</th>
-                      <th className="text-right pb-2 font-semibold pr-3">Tid</th>
-                      <th className="text-right pb-2 font-semibold pr-3">Høyde</th>
-                      <th className="text-right pb-2 font-semibold pr-3">Puls</th>
-                      <th className="text-right pb-2 font-semibold">km/t</th>
+                    <tr className="text-[10px] text-[#6B6B65] uppercase tracking-wider border-b border-[#F0F0EE]">
+                      <th className="text-left pb-2 font-semibold">Dato</th>
+                      <th className="text-left pb-2 font-semibold">Navn</th>
+                      <th className="text-right pb-2 font-semibold">Distanse</th>
+                      <th className="text-right pb-2 font-semibold">Fart</th>
+                      <th className="text-right pb-2 font-semibold">Tid</th>
+                      <th className="text-right pb-2 font-semibold hidden md:table-cell">Fart km/t</th>
+                      <th className="text-right pb-2 font-semibold hidden md:table-cell">Høyde</th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentRuns.slice(0, 10).map((run, i) => (
                       <tr
-                        key={run.id}
-                        className={`border-b border-[#F8F8F6] hover:bg-[#FAFAF8] transition-colors ${i === 0 ? "font-semibold" : ""}`}
+                        key={run.id ?? i}
+                        className="border-b border-[#F0F0EE] last:border-0 hover:bg-[#FAFAF9] transition-colors"
                       >
-                        <td className="py-2.5 pr-3 text-[#6B6B65] whitespace-nowrap">{formatDate(run.start_date_local)}</td>
-                        <td className="py-2.5 pr-3 max-w-[120px] truncate">{run.name}</td>
-                        <td className="py-2.5 pr-3 text-right whitespace-nowrap">{metersToKm(run.distance)} km</td>
-                        <td className="py-2.5 pr-3 text-right font-mono whitespace-nowrap text-[#FC5200]">{activityPace(run)}/km</td>
-                        <td className="py-2.5 pr-3 text-right whitespace-nowrap">{formatMovingTime(run.moving_time)}</td>
-                        <td className="py-2.5 pr-3 text-right whitespace-nowrap text-emerald-600">
-                          {run.total_elevation_gain ? `${Math.round(run.total_elevation_gain)}m` : "—"}
-                        </td>
-                        <td className="py-2.5 pr-3 text-right whitespace-nowrap text-red-400">
-                          {run.average_heartrate ? `♥ ${Math.round(run.average_heartrate)}` : "—"}
-                        </td>
-                        <td className="py-2.5 text-right whitespace-nowrap text-blue-500">
-                          {run.average_speed ? mpsToKmh(run.average_speed) : "—"}
-                        </td>
+                        <td className="py-2.5 text-[#6B6B65] text-xs">{formatDate(run.start_date_local)}</td>
+                        <td className="py-2.5 font-medium text-xs truncate max-w-[120px]">{run.name ?? "Løpetur"}</td>
+                        <td className="py-2.5 text-right font-mono text-xs">{metersToKm(run.distance)} km</td>
+                        <td className="py-2.5 text-right font-mono text-xs" style={{ color: STRAVA_ORANGE }}>{activityPace(run)}/km</td>
+                        <td className="py-2.5 text-right text-xs text-[#6B6B65]">{formatMovingTime(run.moving_time)}</td>
+                        <td className="py-2.5 text-right text-xs text-[#6B6B65] hidden md:table-cell">{mpsToKmh(run.average_speed ?? 0)}</td>
+                        <td className="py-2.5 text-right text-xs text-[#6B6B65] hidden md:table-cell">{run.total_elevation_gain ? `${Math.round(run.total_elevation_gain)}m` : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -878,82 +977,84 @@ export default function DashboardClient({ stravaData, stravaStatus }: Props) {
               </div>
             </div>
           )}
+
+          {/* Weekly plan */}
+          <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-sm">Ukesplan</h3>
+              <Link href="/dashboard/plan" className="flex items-center gap-1 text-xs text-[#FC5200] font-medium hover:underline">
+                Se full plan <ChevronRight size={12} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {thisWeek.map((session, i) => (
+                <div
+                  key={i}
+                  className={`rounded-xl p-2 flex flex-col items-center gap-1 text-center transition-colors ${
+                    session.today
+                      ? "bg-[rgba(252,82,0,0.08)] border border-[rgba(252,82,0,0.20)]"
+                      : session.done
+                      ? "bg-emerald-50 border border-emerald-200"
+                      : "bg-[#F5F5F3] border border-transparent"
+                  }`}
+                >
+                  <span className="text-[9px] font-bold text-[#6B6B65] uppercase">{session.day}</span>
+                  <span className="text-base leading-none">{session.icon}</span>
+                  <span className="text-[8px] text-[#6B6B65] leading-tight">{session.type}</span>
+                  {session.done && (
+                    <span className="text-[8px] text-emerald-600 font-bold">✓</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* AI Coach CTA */}
+          <div className="bg-gradient-to-br from-[#111110] to-[#2A2A28] rounded-2xl p-6 text-white">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain size={18} className="text-[#FC5200]" />
+                  <span className="font-bold">AI-trener</span>
+                </div>
+                <p className="text-sm text-[#A8A8A4] mb-4 max-w-xs">
+                  Få personlig tilpassede råd basert på dine Strava-data og treningsplan.
+                </p>
+                <Link
+                  href="/dashboard/coach"
+                  className="inline-flex items-center gap-2 bg-[#FC5200] hover:bg-[#E04800] text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+                >
+                  <MessageCircle size={14} />
+                  Chat med treneren
+                </Link>
+              </div>
+              <div className="hidden md:flex flex-col gap-2 text-right">
+                <span className="text-xs text-[#6B6B65]">Analyser</span>
+                <span className="text-xs text-[#A8A8A4]">· Løpsform</span>
+                <span className="text-xs text-[#A8A8A4]">· Skaderisiko</span>
+                <span className="text-xs text-[#A8A8A4]">· Ukesplan</span>
+                <span className="text-xs text-[#A8A8A4]">· Kosthold</span>
+              </div>
+            </div>
+          </div>
         </>
       ) : (
-        <div className="bg-white border border-[#E5E5E2] rounded-2xl p-8 mb-6 text-center">
-          <div className="flex justify-center mb-3"><StravaIcon /></div>
-          <h3 className="font-bold mb-2">Koble Strava for analyser</h3>
-          <p className="text-sm text-[#6B6B65] mb-5 max-w-sm mx-auto">
-            Koble til Strava for å se fart, puls, høydemeter, ukentlig volum og løpstrender.
-          </p>
-          <a href="/api/strava/connect" className="inline-flex items-center gap-2 bg-[#FC5200] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-[#E04800] transition-colors">
-            Koble til Strava
-          </a>
-        </div>
-      )}
-
-      {/* Bottom: Plan + Coach */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-        {/* Weekly plan */}
-        <div className="md:col-span-2 bg-white border border-[#E5E5E2] rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-sm">Denne uken</h3>
-            <Link href="/dashboard/plan" className="text-xs text-[#FC5200] flex items-center gap-1 hover:underline font-semibold">
-              Full plan <ChevronRight size={12} />
-            </Link>
-          </div>
-          <div className="space-y-1">
-            {thisWeek.map((d) => (
-              <div
-                key={d.day}
-                className={`flex items-center gap-4 p-2.5 rounded-xl transition-colors ${
-                  d.today ? "bg-[rgba(252,82,0,0.07)] border border-[rgba(252,82,0,0.18)]" : "hover:bg-[#F2F2F0]"
-                }`}
-              >
-                <span className="text-xs font-bold text-[#6B6B65] w-7">{d.day}</span>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-semibold ${
-                      d.done ? "text-[#C8C8C4] line-through" : "text-[#111110]"
-                    }`}>
-                      {d.icon} {d.type}
-                    </span>
-                    {d.today && (
-                      <span className="text-[10px] bg-[#FC5200] text-white px-1.5 py-0.5 rounded-full font-bold">I dag</span>
-                    )}
-                    {d.done && (
-                      <span className="text-[10px] text-emerald-500 font-semibold">✓</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-[#6B6B65]">{d.distance} · {d.pace}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Coach CTA */}
-        <div className="bg-gradient-to-br from-[rgba(252,82,0,0.08)] to-[rgba(252,82,0,0.03)] border border-[rgba(252,82,0,0.15)] rounded-2xl p-5 flex flex-col">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 bg-[#FC5200] rounded-xl flex items-center justify-center">
-              <Brain size={16} className="text-white" />
-            </div>
-            <div>
-              <div className="font-bold text-sm">AI-trener</div>
-              <div className="text-xs text-[#6B6B65]">Personlig rådgiver</div>
-            </div>
-          </div>
-          <p className="text-xs text-[#6B6B65] mb-4 flex-1">
-            Spør om treningsplanen, hva du bør fokusere på denne uken, eller få råd om skader og restitusjon.
+        /* No Strava data — connect prompt */
+        <div className="bg-white border border-[#E5E5E2] rounded-2xl p-8 text-center">
+          <StravaIcon />
+          <h2 className="text-lg font-bold mt-4 mb-2">Koble til Strava</h2>
+          <p className="text-sm text-[#6B6B65] mb-6 max-w-sm mx-auto">
+            Koble til Strava-kontoen din for å se løpsstatistikk, fartstrender og ukentlig volum.
           </p>
           <Link
-            href="/dashboard/coach"
-            className="flex items-center justify-center gap-2 bg-[#FC5200] text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-[#E04800] transition-colors"
+            href="/api/strava/connect"
+            className="inline-flex items-center gap-2 bg-[#FC5200] text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-[#E04800] transition-colors"
           >
-            <MessageCircle size={14} /> Chat med trener
+            <StravaIcon />
+            Koble til Strava
           </Link>
         </div>
-      </div>
+      )}
     </div>
   );
 }
