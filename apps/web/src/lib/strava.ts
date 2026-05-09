@@ -52,6 +52,7 @@ export interface StravaActivity {
   max_speed: number; // m/s
   average_heartrate?: number;
   max_heartrate?: number;
+  average_cadence?: number;
   suffer_score?: number;
   kudos_count: number;
   achievement_count: number;
