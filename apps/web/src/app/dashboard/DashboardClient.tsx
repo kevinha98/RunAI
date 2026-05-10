@@ -960,18 +960,26 @@ interface PaceProgressResult {
   badgeBgClass: string;
   badgeTextClass: string;
   label: string;
+  sessionCount: number;
 }
 
 function computePaceProgress(runs: StravaActivity[]): PaceProgressResult | null {
-  const validRuns = runs.filter((r) => r.distance > 0 && r.moving_time > 0);
-  if (validRuns.length === 0) return null;
+  // Only use threshold sessions: name must contain 'terskel' (case-insensitive)
+  const thresholdRuns = runs.filter(
+    (r) =>
+      r.distance > 0 &&
+      r.moving_time > 0 &&
+      (r.name ?? "").toLowerCase().includes("terskel")
+  );
+  if (thresholdRuns.length === 0) return null;
 
-  const sorted = [...validRuns].sort(
+  const sorted = [...thresholdRuns].sort(
     (a, b) =>
       new Date(b.start_date_local).getTime() -
       new Date(a.start_date_local).getTime()
   );
 
+  // Average pace of the 5 most recent threshold sessions
   const recent5 = sorted.slice(0, 5);
   const avgSec =
     recent5.reduce((sum, r) => sum + r.moving_time / (r.distance / 1000), 0) /
@@ -1025,6 +1033,7 @@ function computePaceProgress(runs: StravaActivity[]): PaceProgressResult | null 
     badgeBgClass,
     badgeTextClass,
     label,
+    sessionCount: recent5.length,
   };
 }
 
@@ -1477,7 +1486,7 @@ export default function DashboardClient({
                     <p className="text-2xl font-black text-[#111110] tabular-nums">
                       {formatPace(paceProgress.currentPaceSec)}
                     </p>
-                    <p className="text-xs text-[#9B9B95]">snitt siste 5 løp</p>
+                    <p className="text-xs text-[#9B9B95]">snitt terskeløkter ({paceProgress.sessionCount})</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-[#6B6B65]">{TARGET_PACE_LABEL}</p>
