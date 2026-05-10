@@ -2,6 +2,7 @@
 import DashboardSidebar from "./DashboardSidebar";
 import { readUserStats } from "@/lib/stats-store";
 import { createClient } from "@/lib/supabase/server";
+import { getAnyStravaUserId } from "@/lib/db/user-strava";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,8 @@ interface PageProps {
 export default async function DashboardPage({ searchParams }: PageProps) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
-  const stats = await readUserStats(user?.id ?? "");
+  const userId = user?.id ?? await getAnyStravaUserId() ?? "";
+  const stats = await readUserStats(userId);
   const params = await searchParams;
   return (
     <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex">

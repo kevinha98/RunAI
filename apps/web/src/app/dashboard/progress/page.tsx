@@ -3,6 +3,7 @@ import DashboardSidebar from "../DashboardSidebar";
 import { readUserStats } from "@/lib/stats-store";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import type { StravaActivity } from "@/lib/strava-types";
 
 export const dynamic = "force-dynamic";
@@ -437,7 +438,8 @@ export default async function ProgressPage() {
     // No auth required — continue without user
   }
 
-  const stats = await readUserStats(user?.id ?? "");
+  const userId = user?.id ?? await getAnyStravaUserId() ?? "";
+  const stats = await readUserStats(userId);
 
   const allActivities = stats?.recentActivities ?? [];
   const runs = allActivities.filter(

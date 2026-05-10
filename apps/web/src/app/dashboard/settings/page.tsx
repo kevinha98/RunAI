@@ -1,4 +1,5 @@
 ﻿import { createClient } from "@/lib/supabase/server";
+import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import DashboardSidebar from "../DashboardSidebar";
 import { readUserStats } from "@/lib/stats-store";
 import SettingsClient from "./SettingsClient";
@@ -8,8 +9,8 @@ export const metadata = { title: "Innstillinger" };
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
-  const stats = await readUserStats(user?.id ?? "");
+  const userId = user?.id ?? await getAnyStravaUserId() ?? "";
+  const stats = await readUserStats(userId);
 
   return (
     <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex">
