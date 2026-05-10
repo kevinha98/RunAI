@@ -23,7 +23,6 @@ const NAV_ITEMS = [
   { icon: Zap, label: "Styrke", href: "/dashboard/strength" },
   { icon: ClipboardList, label: "Ukerapport", href: "/dashboard/checkin" },
   { icon: Timer, label: "Tidsprediksjon", href: "/dashboard/predict" },
-  { icon: Timer, label: "Tidsprediksjon", href: "/dashboard/predict" },
   { icon: Settings, label: "Innstillinger", href: "/dashboard/settings" },
 ];
 
@@ -46,7 +45,7 @@ export default async function DashboardSidebar({ stats, activePath }: Props) {
   const displayEmail = user?.email ?? null;
 
   return (
-    <div className="hidden md:flex fixed left-0 top-0 bottom-0 w-60 border-r border-[#E5E5E2] bg-white flex-col p-5 z-40">
+    <div className="hidden md:flex sticky top-0 h-screen w-60 shrink-0 border-r border-[#E5E5E2] bg-white flex-col p-5 z-40 overflow-y-auto">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2.5 mb-8">
         <div className="w-7 h-7 bg-[#FC5200] rounded-lg flex items-center justify-center">
