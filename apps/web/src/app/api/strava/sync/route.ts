@@ -22,6 +22,107 @@ const CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 
 // ---------------------------------------------------------------------------
+// Next.js route segment config — revalidate every 5 minutes
+// ---------------------------------------------------------------------------
+
+export const revalidate = CACHE_TTL_SECONDS;
+
+// ---------------------------------------------------------------------------
+// Cache helper functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a simple ETag based on the lastSync timestamp.
+ * Converts the ISO timestamp to milliseconds and formats as a hex string.
+ */
+function generateETag(lastSync: string): string {
+  const ms = new Date(lastSync).getTime();
+  return `"sync-${ms.toString(16)}"`;
+}
+
+/**
+ * Checks if the client's If-None-Match header matches the generated ETag.
+ * Returns true if the client already has fresh data (=> 304 Not Modified).
+ */
+function isETagFresh(req: NextRequest, etag: string): boolean {
+  const clientETag = req.headers.get("if-none-match");
+  return clientETag !== null && clientETag === etag;
+}
+
+/**
+ * Checks whether existing sync data is still within the TTL window.
+ * Returns true if the data is fresher than CACHE_TTL_MS milliseconds.
+ */
+function isSyncFresh(lastSync: string): boolean {
+  const ageMs = Date.now() - new Date(lastSync).getTime();
+  return ageMs < CACHE_TTL_MS;
+}
+
+/**
+ * Builds Cache-Control and related headers for sync responses.
+ * Uses 'private' since data is user-specific.
+ * Includes stale-while-revalidate so the browser can serve stale data
+ * while a background revalidation request is in flight.
+ */
+function buildCacheHeaders(
+  lastSync: string,
+  cacheStatus: "HIT" | "MISS"
+): Record<string, string> {
+  const etag = generateETag(lastSync);
+  return {
+    "Cache-Control": `private, max-age=${CACHE_TTL_SECONDS}, stale-while-revalidate=${CACHE_TTL_SECONDS}`,
+    "ETag": etag,
+    "Last-Modified": new Date(lastSync).toUTCString(),
+    "X-Cache": cacheStatus,
+    "X-Last-Sync": lastSync,
+  };
+}
+
+/**
+ * Builds a 304 Not Modified response with all required cache headers.
+ * Centralises the repeated 304 response construction to a single place.
+ */
+function buildNotModifiedResponse(
+  lastSync: string,
+  reason: "etag" | "ttl"
+): NextResponse {
+  const etag = generateETag(lastSync);
+  const lastSyncDate = new Date(lastSync);
+  const ageSeconds = Math.round((Date.now() - lastSyncDate.getTime()) / 1000);
+
+  console.info(
+    `[strava/sync] 304 Not Modified (${
+      reason === "etag" ? "ETag match" : `TTL — ${ageSeconds}s ago`
+    }) — lastSync: ${lastSync}`
+  );
+
+  return new NextResponse(null, {
+    status: 304,
+    headers: {
+      "Cache-Control": `private, max-age=${CACHE_TTL_SECONDS}, stale-while-revalidate=${CACHE_TTL_SECONDS}`,
+      "ETag": etag,
+      "Last-Modified": lastSyncDate.toUTCString(),
+      "X-Cache": "HIT",
+      "X-Last-Sync": lastSync,
+    },
+  });
+}
+
+/**
+ * Logs a successful sync with timestamp, user, and activity counts.
+ */
+function logSyncTimestamp(
+  userId: string,
+  syncTimestamp: string,
+  activityCount: number,
+  runCount: number
+): void {
+  console.info(
+    `[strava/sync] Successful sync for user ${userId} at ${syncTimestamp} — ${activityCount} activities, ${runCount} runs`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
@@ -49,28 +150,21 @@ export async function POST(req: NextRequest) {
 
   try {
     // -------------------------------------------------------------------------
-    // Cache freshness check — return 304 if data is younger than TTL
+    // Cache freshness check — ETag match or TTL-based early return
     // -------------------------------------------------------------------------
     const existingStats = await readUserStats(userId);
 
     if (existingStats?.lastSync) {
-      const lastSyncDate = new Date(existingStats.lastSync);
-      const ageMs = Date.now() - lastSyncDate.getTime();
+      const etag = generateETag(existingStats.lastSync);
 
-      if (ageMs < CACHE_TTL_MS) {
-        const ageSeconds = Math.round(ageMs / 1000);
-        console.info(
-          `[strava/sync] 304 Not Modified — last sync was ${ageSeconds}s ago (${existingStats.lastSync})`
-        );
-        return new NextResponse(null, {
-          status: 304,
-          headers: {
-            "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}, stale-while-revalidate=${CACHE_TTL_SECONDS}`,
-            "Last-Modified": lastSyncDate.toUTCString(),
-            "X-Cache": "HIT",
-            "X-Last-Sync": existingStats.lastSync,
-          },
-        });
+      // ETag match — client already has identical data, no need to resync
+      if (isETagFresh(req, etag)) {
+        return buildNotModifiedResponse(existingStats.lastSync, "etag");
+      }
+
+      // TTL not expired — data is fresh, skip Strava API call
+      if (isSyncFresh(existingStats.lastSync)) {
+        return buildNotModifiedResponse(existingStats.lastSync, "ttl");
       }
     }
 
@@ -121,9 +215,7 @@ export async function POST(req: NextRequest) {
     await writeUserStats(userId, stats);
     revalidatePath("/dashboard");
 
-    console.info(
-      `[strava/sync] Successful sync for user ${userId} at ${syncTimestamp} — ${activities.length} activities, ${runs.length} runs`
-    );
+    logSyncTimestamp(userId, syncTimestamp, activities.length, runs.length);
 
     return NextResponse.json(
       {
@@ -135,12 +227,7 @@ export async function POST(req: NextRequest) {
         ...(scopeError ? { warning: scopeError } : {}),
       },
       {
-        headers: {
-          "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}, stale-while-revalidate=${CACHE_TTL_SECONDS}`,
-          "Last-Modified": new Date(syncTimestamp).toUTCString(),
-          "X-Cache": "MISS",
-          "X-Last-Sync": syncTimestamp,
-        },
+        headers: buildCacheHeaders(syncTimestamp, "MISS"),
       }
     );
   } catch (err) {

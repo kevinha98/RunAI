@@ -42,6 +42,37 @@ interface HistoryEntry {
   created_at: string;
 }
 
+// ─── localStorage helpers ────────────────────────────────────────────────────
+
+const LOCAL_HISTORY_KEY = "checkin-history";
+const MAX_LOCAL_HISTORY = 4;
+
+function loadLocalHistory(): HistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as HistoryEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function saveToLocalHistory(entry: HistoryEntry): HistoryEntry[] {
+  const existing = loadLocalHistory();
+  // Replace existing entry for same week if present, otherwise prepend
+  const filtered = existing.filter((h) => h.week_number !== entry.week_number);
+  const updated = [entry, ...filtered].slice(0, MAX_LOCAL_HISTORY);
+  try {
+    localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(updated));
+  } catch {
+    // Storage quota exceeded — silently ignore
+  }
+  return updated;
+}
+
 // ─── Markdown renderer (lightweight, no dep needed) ──────────────────────────
 
 function renderMarkdown(text: string): string {
@@ -57,6 +88,154 @@ function renderMarkdown(text: string): string {
     .replace(/^(?!<[hul])(.+)$/gm, "<p class=\"text-[#3B3B37] leading-relaxed\">$1</p>");
 }
 
+// ─── LocalHistorySection component ───────────────────────────────────────────
+
+interface LocalHistorySectionProps {
+  entries: HistoryEntry[];
+  expandedId: string | null;
+  onToggle: (id: string) => void;
+}
+
+function LocalHistorySection({
+  entries,
+  expandedId,
+  onToggle,
+}: LocalHistorySectionProps) {
+  if (entries.length === 0) return null;
+
+  return (
+    <section className="mt-8">
+      <div className="flex items-center gap-2 mb-4">
+        <History size={14} className="text-[#9B9B95]" />
+        <h2 className="text-sm font-bold text-[#111110]">Siste ukerapporter</h2>
+        <span className="ml-auto text-xs text-[#9B9B95]">
+          Siste {entries.length} rapport{entries.length !== 1 ? "er" : ""}
+        </span>
+      </div>
+
+      <ul className="space-y-3">
+        {entries.map((entry) => {
+          const isOpen = expandedId === entry.id;
+          const preview =
+            entry.llm_analysis.length > 150
+              ? entry.llm_analysis.slice(0, 150).trimEnd() + "…"
+              : entry.llm_analysis;
+
+          const formattedDate = (() => {
+            try {
+              return new Date(entry.created_at || entry.week_date).toLocaleDateString("nb-NO", {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
+            } catch {
+              return entry.week_date;
+            }
+          })();
+
+          return (
+            <li
+              key={entry.id}
+              className="bg-white border border-[#E5E5E2] rounded-2xl overflow-hidden hover:border-[#C8C8C4] transition-colors"
+            >
+              {/* Card header */}
+              <button
+                type="button"
+                onClick={() => onToggle(entry.id)}
+                className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-[#FAFAF9] transition-colors"
+                aria-expanded={isOpen}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#FC5200] bg-opacity-10 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-[#FC5200]">
+                      U{entry.week_number}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#111110]">
+                      Uke {entry.week_number}
+                    </p>
+                    <p className="text-[11px] text-[#9B9B95]">{formattedDate}</p>
+                  </div>
+                </div>
+                {isOpen ? (
+                  <ChevronUp size={14} className="text-[#9B9B95] shrink-0 ml-3" />
+                ) : (
+                  <ChevronDown size={14} className="text-[#9B9B95] shrink-0 ml-3" />
+                )}
+              </button>
+
+              {/* Collapsed preview */}
+              {!isOpen && (
+                <div className="px-4 pb-3.5 -mt-1">
+                  <p className="text-xs text-[#6B6B65] leading-relaxed">
+                    {preview}
+                  </p>
+                </div>
+              )}
+
+              {/* Expanded content */}
+              {isOpen && (
+                <div className="border-t border-[#E5E5E2] px-4 py-4 space-y-4">
+                  {/* Full LLM analysis */}
+                  <div>
+                    <p className="text-[10px] font-semibold text-[#9B9B95] uppercase tracking-wide mb-1.5">
+                      Trenerens analyse
+                    </p>
+                    <div
+                      className="text-xs leading-relaxed"
+                      dangerouslySetInnerHTML={{
+                        __html: renderMarkdown(entry.llm_analysis),
+                      }}
+                    />
+                  </div>
+                  {/* User report */}
+                  {entry.user_report && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-[#9B9B95] uppercase tracking-wide mb-1.5">
+                        Din rapport
+                      </p>
+                      <p className="text-xs text-[#3B3B37] leading-relaxed whitespace-pre-wrap">
+                        {entry.user_report}
+                      </p>
+                    </div>
+                  )}
+                  {/* Adjustments */}
+                  {entry.adjustments && entry.adjustments.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-[#9B9B95] uppercase tracking-wide mb-1.5">
+                        Planforslag ({entry.adjustments.length})
+                      </p>
+                      <ul className="space-y-1.5">
+                        {entry.adjustments.map((adj, i) => (
+                          <li
+                            key={i}
+                            className="bg-[#FFF8F5] border border-[#FCDCC8] rounded-lg px-2.5 py-2 text-[11px]"
+                          >
+                            <span className="font-semibold text-[#FC5200]">
+                              Uke {adj.weekNum}, {adj.day}
+                            </span>{" "}
+                            —{" "}
+                            <span className="line-through text-[#9B9B95]">{adj.from}</span>{" "}
+                            →{" "}
+                            <span className="font-medium text-[#111110]">{adj.to}</span>
+                            <p className="text-[#9B9B95] mt-0.5">{adj.reason}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CheckinPage() {
@@ -68,8 +247,10 @@ export default function CheckinPage() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [showAdjustments, setShowAdjustments] = useState(false);
+  const [localHistory, setLocalHistory] = useState<HistoryEntry[]>([]);
+  const [expandedLocalId, setExpandedLocalId] = useState<string | null>(null);
 
-  // Load history on mount
+  // Load server history on mount
   useEffect(() => {
     fetch("/api/checkin")
       .then((r) => r.json())
@@ -78,8 +259,17 @@ export default function CheckinPage() {
       .finally(() => setLoadingHistory(false));
   }, []);
 
+  // Load localStorage history on mount
+  useEffect(() => {
+    setLocalHistory(loadLocalHistory());
+  }, []);
+
   const charCount = report.length;
   const canSubmit = charCount >= 10 && charCount <= 4000 && !submitting;
+
+  function toggleLocalHistory(id: string) {
+    setExpandedLocalId((prev) => (prev === id ? null : id));
+  }
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -104,18 +294,25 @@ export default function CheckinPage() {
       setResult(data as CheckinResult);
       setReport("");
 
-      // Prepend to history list
+      // Build new history entry
+      const newEntry: HistoryEntry = {
+        id: data.id ?? `local-${Date.now()}`,
+        week_number: data.weekNumber,
+        week_date: new Date().toISOString().slice(0, 10),
+        user_report: report,
+        llm_analysis: data.analysis,
+        adjustments: data.adjustments ?? [],
+        created_at: new Date().toISOString(),
+      };
+
+      // Save to localStorage and update local history state
+      const updatedLocal = saveToLocalHistory(newEntry);
+      setLocalHistory(updatedLocal);
+
+      // Prepend to server history list
       if (data.id) {
         setHistory((prev) => [
-          {
-            id: data.id,
-            week_number: data.weekNumber,
-            week_date: new Date().toISOString().slice(0, 10),
-            user_report: report,
-            llm_analysis: data.analysis,
-            adjustments: data.adjustments,
-            created_at: new Date().toISOString(),
-          },
+          newEntry,
           ...prev.filter((h) => h.week_number !== data.weekNumber),
         ]);
       }
@@ -254,7 +451,7 @@ export default function CheckinPage() {
         </section>
       )}
 
-      {/* History */}
+      {/* Server History */}
       <section>
         <div className="flex items-center gap-2 mb-4">
           <History size={14} className="text-[#9B9B95]" />
@@ -367,6 +564,13 @@ export default function CheckinPage() {
           </ul>
         )}
       </section>
+
+      {/* localStorage-based recent history */}
+      <LocalHistorySection
+        entries={localHistory}
+        expandedId={expandedLocalId}
+        onToggle={toggleLocalHistory}
+      />
     </main>
   );
 }
