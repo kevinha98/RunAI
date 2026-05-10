@@ -880,6 +880,92 @@ function ZoneDistributionChart({ runs, avgPaceSecPerKm }: { runs: StravaActivity
 
 // ── Main DashboardClient Component ───────────────────────────────────────────
 
+// ── CoachBriefCard ────────────────────────────────────────────────────────────
+
+function CoachBriefCard() {
+  const [brief, setBrief] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const CACHE_KEY = "runai-coach-brief-v1";
+  const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+  const load = useCallback(async (force = false) => {
+    if (!force) {
+      try {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { text, ts } = JSON.parse(cached) as { text: string; ts: number };
+          if (Date.now() - ts < CACHE_TTL_MS) {
+            setBrief(text);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    try {
+      const res = await fetch("/api/coach-brief");
+      if (res.ok) {
+        const data = await res.json() as { brief: string };
+        setBrief(data.brief);
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ text: data.brief, ts: Date.now() }));
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+    setRefreshing(false);
+  }, [CACHE_TTL_MS]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    load(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="mb-5 bg-white border border-[#E5E5E2] rounded-2xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Brain className="h-4 w-4 text-[#FC5200]" />
+          <span className="text-xs font-semibold text-[#6B6B65] uppercase tracking-wide">Fra coachen</span>
+        </div>
+        <div className="space-y-2">
+          <div className="h-3 bg-[#F0F0EE] rounded-full animate-pulse w-full" />
+          <div className="h-3 bg-[#F0F0EE] rounded-full animate-pulse w-5/6" />
+          <div className="h-3 bg-[#F0F0EE] rounded-full animate-pulse w-4/6" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!brief) return null;
+
+  return (
+    <div className="mb-5 bg-white border border-[#E5E5E2] rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-[#FC5200]" />
+          <span className="text-xs font-semibold text-[#6B6B65] uppercase tracking-wide">Fra coachen</span>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="text-[#9B9B95] hover:text-[#6B6B65] transition-colors disabled:opacity-40"
+          aria-label="Oppdater"
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="space-y-2">
+        {brief.split("\n\n").filter(Boolean).map((para, i) => (
+          <p key={i} className="text-sm text-[#3B3B38] leading-relaxed">{para}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardClient({
   stravaData: stats,
   stravaStatus,
@@ -1040,6 +1126,9 @@ export default function DashboardClient({
             <span className="text-[10px] text-[#9B9B95]">Løpsdag</span>
           </div>
         </div>
+
+        {/* ── Coach brief ── */}
+        <CoachBriefCard />
 
         {/* ── Weekly summary ── */}
         <div className="grid grid-cols-2 gap-3 mb-5">
