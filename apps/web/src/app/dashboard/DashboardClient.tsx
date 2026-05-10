@@ -23,6 +23,7 @@ import type { StoredStats, StravaActivity } from "@/lib/strava-types";
 import { formatPace, computePaceZoneDistribution, computePersonalBests } from "@/lib/strava-types";
 import { getCurrentWeek, WEEKS, PLAN_START, RACE_DATE as RACE_DATE_OBJ } from "@/lib/plan-data";
 import type { Phase, Week } from "@/lib/plan-data";
+import { cameronPredict, DIST, formatTime } from "@/lib/race-predictor";
 
 const STRAVA_ORANGE = "#FC5200";
 const RACE_DATE = "2027-04-24";
@@ -1027,6 +1028,232 @@ function computePaceProgress(runs: StravaActivity[]): PaceProgressResult | null 
   };
 }
 
+// ── HalfMarathonTrendCard ───────────────────────────────────────────────────
+
+interface HMMonthPoint {
+  monthKey: string;
+  label: string;
+  hmSec: number;
+  monthIndex: number;
+}
+
+function buildHMMonthPoints(activities: StravaActivity[]): HMMonthPoint[] {
+  const qualifying = activities.filter(a => {
+    if (a.type !== "Run" && a.sport_type !== "Run") return false;
+    if (a.distance < 5000 || a.moving_time <= 0) return false;
+    const secPerKm = a.moving_time / (a.distance / 1000);
+    return secPerKm >= 210 && secPerKm <= 480; // 3:30–8:00 min/km
+  });
+  if (qualifying.length === 0) return [];
+
+  const byMonth = new Map<string, number>();
+  for (const run of qualifying) {
+    const month = run.start_date_local.slice(0, 7);
+    const hmEst = cameronPredict(run.moving_time, run.distance, DIST.HALF_MARATHON);
+    const prev = byMonth.get(month);
+    if (prev === undefined || hmEst < prev) byMonth.set(month, hmEst);
+  }
+  const sorted = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return sorted.map(([monthKey, hmSec], i) => {
+    const [yr, mo] = monthKey.split("-");
+    const label = new Date(Number(yr), Number(mo) - 1, 1)
+      .toLocaleDateString("nb-NO", { month: "short", year: "2-digit" });
+    return { monthKey, label, hmSec, monthIndex: i };
+  });
+}
+
+function hmRegression(pts: HMMonthPoint[]): { slope: number; intercept: number } | null {
+  if (pts.length < 2) return null;
+  const n = pts.length;
+  const sx = pts.reduce((s, p) => s + p.monthIndex, 0);
+  const sy = pts.reduce((s, p) => s + p.hmSec, 0);
+  const sxy = pts.reduce((s, p) => s + p.monthIndex * p.hmSec, 0);
+  const sx2 = pts.reduce((s, p) => s + p.monthIndex * p.monthIndex, 0);
+  const d = n * sx2 - sx * sx;
+  if (d === 0) return null;
+  const slope = (n * sxy - sx * sy) / d;
+  const intercept = (sy - slope * sx) / n;
+  return { slope, intercept };
+}
+
+function HalfMarathonTrendCard({ activities }: { activities: StravaActivity[] }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const points = useMemo(() => buildHMMonthPoints(activities), [activities]);
+  const regression = useMemo(() => hmRegression(points), [points]);
+
+  const raceMonthIndex = useMemo(() => {
+    if (!points.length) return null;
+    const [fy, fm] = points[0].monthKey.split("-").map(Number);
+    return (2027 - fy) * 12 + (4 - fm); // months from first data point to April 2027
+  }, [points]);
+
+  const raceDayProjection = useMemo(() => {
+    if (!regression || raceMonthIndex === null) return null;
+    const raw = regression.intercept + regression.slope * raceMonthIndex;
+    return Math.max(3600, Math.min(14400, raw)); // clamp 1h–4h
+  }, [regression, raceMonthIndex]);
+
+  const currentBest = useMemo(
+    () => (points.length ? Math.min(...points.map(p => p.hmSec)) : null),
+    [points]
+  );
+
+  if (points.length < 2) {
+    return (
+      <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
+        <div className="flex items-center gap-2 mb-2">
+          <Timer className="w-4 h-4 text-[#FC5200] shrink-0" />
+          <h3 className="text-sm font-bold text-[#111110]">Halvmaraton-estimat</h3>
+        </div>
+        <p className="text-xs text-[#9B9B95] italic">
+          {points.length === 0
+            ? "Ikke nok løpedata. Logg løp for å se halvmaraton-estimat."
+            : "Trenger data fra minst 2 måneder for trendlinje."}
+        </p>
+      </div>
+    );
+  }
+
+  const W = 300; const H = 80; const PAD_R = 38;
+  const chartW = W - PAD_R;
+  const xMax = raceMonthIndex ?? points[points.length - 1].monthIndex;
+  const xScale = (idx: number) => (idx / Math.max(xMax, 1)) * chartW;
+
+  const yVals = [
+    ...points.map(p => p.hmSec),
+    ...(raceDayProjection ? [raceDayProjection] : []),
+  ];
+  const yMin = Math.min(...yVals) - 360; // 6 min buffer
+  const yMax_ = Math.max(...yVals) + 360;
+  // Lower seconds = faster = higher on chart (lower SVG y)
+  const yScale = (s: number) => ((s - yMin) / (yMax_ - yMin)) * H;
+
+  const pathD = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${xScale(p.monthIndex).toFixed(1)},${yScale(p.hmSec).toFixed(1)}`)
+    .join(" ");
+  const lastPt = points[points.length - 1];
+  const areaD = `${pathD} L${xScale(lastPt.monthIndex).toFixed(1)},${H} L${xScale(0).toFixed(1)},${H} Z`;
+
+  const improving = regression !== null && regression.slope < 0;
+  const trendX1 = xScale(points[0].monthIndex);
+  const trendY1 = regression ? yScale(regression.intercept) : 0;
+  const trendX2 = raceMonthIndex !== null ? xScale(raceMonthIndex) : xScale(lastPt.monthIndex);
+  const trendY2 = raceDayProjection ? yScale(raceDayProjection) : trendY1;
+  const trendColor = improving ? "#10b981" : "#f59e0b";
+
+  return (
+    <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Timer className="w-4 h-4 text-[#FC5200] shrink-0" />
+          <h3 className="text-sm font-bold text-[#111110]">Halvmaraton-estimat</h3>
+        </div>
+        <Link href="/dashboard/predict" className="text-xs text-[#FC5200] hover:underline font-medium">Kalkulator →</Link>
+      </div>
+
+      <div className="flex items-end gap-5 mb-3">
+        <div>
+          <p className="text-[10px] text-[#9B9B95] uppercase tracking-wide mb-0.5">Nåværende beste</p>
+          <p className="text-2xl font-black text-[#FC5200] tabular-nums leading-tight">
+            {formatTime(Math.round(currentBest!))}
+          </p>
+        </div>
+        {raceDayProjection && (
+          <div>
+            <p className="text-[10px] text-[#9B9B95] uppercase tracking-wide mb-0.5">Prediksjon apr 2027</p>
+            <p className={`text-xl font-bold tabular-nums leading-tight ${
+              improving ? "text-emerald-600" : "text-amber-600"
+            }`}>
+              {formatTime(Math.round(raceDayProjection))}
+            </p>
+          </div>
+        )}
+        <div className="ml-auto self-start">
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+            improving
+              ? "bg-green-50 text-green-700 border-green-200"
+              : "bg-amber-50 text-amber-700 border-amber-200"
+          }`}>
+            {improving ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {improving ? "Forbedring" : "Tilbakegang"}
+          </span>
+        </div>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full" style={{ overflow: "visible" }}>
+        <defs>
+          <linearGradient id="hmAreaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={STRAVA_ORANGE} stopOpacity="0.12" />
+            <stop offset="100%" stopColor={STRAVA_ORANGE} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill="url(#hmAreaGrad)" />
+        {/* Trend projection */}
+        {regression && (
+          <line x1={trendX1} y1={trendY1} x2={trendX2} y2={trendY2}
+            stroke={trendColor} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.65} />
+        )}
+        {/* Race date marker */}
+        {raceMonthIndex !== null && (
+          <>
+            <line x1={xScale(raceMonthIndex)} y1={0} x2={xScale(raceMonthIndex)} y2={H}
+              stroke="#FC5200" strokeWidth={1} strokeDasharray="3 2" opacity={0.3} />
+            <text x={xScale(raceMonthIndex) + 2} y={9} fontSize={6.5} fill="#FC5200" opacity={0.55}>BCM 27</text>
+          </>
+        )}
+        {/* Actual line */}
+        <path d={pathD} stroke={STRAVA_ORANGE} strokeWidth="2" fill="none"
+          strokeLinejoin="round" strokeLinecap="round" />
+        {/* Dots + tooltips */}
+        {points.map((p, i) => {
+          const cx = xScale(p.monthIndex);
+          const cy = yScale(p.hmSec);
+          const isH = hoveredIdx === i;
+          const TW = 96; const TH = 38;
+          const tx = Math.min(cx, W - PAD_R - TW - 2);
+          const ty = Math.max(2, cy - TH - 6);
+          return (
+            <g key={i}>
+              <circle cx={cx} cy={cy} r={9} fill="transparent"
+                onMouseEnter={() => setHoveredIdx(i)} onMouseLeave={() => setHoveredIdx(null)}
+                style={{ cursor: "pointer" }} />
+              <circle cx={cx} cy={cy} r={isH ? 4 : 2.5}
+                fill="white" stroke={STRAVA_ORANGE} strokeWidth={isH ? 2 : 1.5}
+                style={{ pointerEvents: "none" }} />
+              {(i === 0 || i === points.length - 1) && (
+                <text x={cx} y={H + 13} textAnchor="middle" fontSize={7} fill="#9B9B95"
+                  style={{ pointerEvents: "none" }}>{p.label}</text>
+              )}
+              {isH && (
+                <g style={{ pointerEvents: "none" }}>
+                  <rect x={tx} y={ty} width={TW} height={TH}
+                    rx={4} fill="white" stroke="#E5E5E2" strokeWidth={1}
+                    style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.08))" }} />
+                  <text x={tx + TW / 2} y={ty + 12} textAnchor="middle" fontSize={7.5} fill="#6B6B65" fontWeight="600">
+                    {p.label}
+                  </text>
+                  <text x={tx + TW / 2} y={ty + 28} textAnchor="middle" fontSize={11} fontWeight="bold" fill={STRAVA_ORANGE}>
+                    {formatTime(Math.round(p.hmSec))}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+        {/* Projected race-day dot */}
+        {raceDayProjection && raceMonthIndex !== null && (
+          <circle cx={trendX2} cy={trendY2} r={3}
+            fill="white" stroke={trendColor} strokeWidth={2}
+            style={{ pointerEvents: "none" }} />
+        )}
+      </svg>
+      <p className="text-[9px] text-[#9B9B95] mt-0.5 leading-tight">
+        Beste Cameron-estimat per måned · Stiplet linje = trend mot Bergen City Marathon apr 2027
+      </p>
+    </div>
+  );
+}
+
 // ── DashboardClient ──────────────────────────────────────────────────────────
 
 export default function DashboardClient({
@@ -1270,6 +1497,9 @@ export default function DashboardClient({
                 </div>
               </div>
             )}
+
+            {/* Halvmaraton-estimat trend */}
+            <HalfMarathonTrendCard activities={allActivities} />
 
             {/* PR-kort */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
