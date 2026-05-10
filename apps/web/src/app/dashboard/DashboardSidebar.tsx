@@ -1,6 +1,6 @@
 ﻿import Link from "next/link";
 import Image from "next/image";
-import { Activity, Calendar, Brain, TrendingUp, Zap, ClipboardList, RefreshCw } from "lucide-react";
+import { Activity, Calendar, Brain, TrendingUp, Zap, ClipboardList, RefreshCw, Settings } from "lucide-react";
 import type { StoredStats } from "@/lib/strava-types";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { icon: TrendingUp, label: "Fremgang", href: "/dashboard/progress" },
   { icon: Zap, label: "Styrke", href: "/dashboard/strength" },
   { icon: ClipboardList, label: "Ukerapport", href: "/dashboard/checkin" },
+  { icon: Settings, label: "Innstillinger", href: "/dashboard/settings" },
 ];
 
 interface Props {
