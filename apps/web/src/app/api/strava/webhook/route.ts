@@ -41,16 +41,46 @@ interface StravaWebhookEvent {
   updates: Record<string, string>;
 }
 
+// In-memory dedup cache: eventKey → timestamp processed
+// Prevents double-processing if Strava retries within the same instance lifetime
+const processedEvents = new Map<string, number>();
+const DEDUP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Returns true if this event was already processed recently */
+function isDuplicate(event: StravaWebhookEvent): boolean {
+  const key = `${event.object_type}.${event.aspect_type}.${event.object_id}.${event.event_time}`;
+  const now = Date.now();
+
+  // Prune stale entries
+  for (const [k, ts] of processedEvents.entries()) {
+    if (now - ts > DEDUP_TTL_MS) processedEvents.delete(k);
+  }
+
+  if (processedEvents.has(key)) return true;
+  processedEvents.set(key, now);
+  return false;
+}
+
 export async function POST(req: NextRequest) {
   // Respond 200 immediately — Strava requires a response within 2 seconds
   const event = (await req.json()) as StravaWebhookEvent;
 
-  console.log(`[strava/webhook] Event: ${event.object_type}.${event.aspect_type} id=${event.object_id} owner=${event.owner_id}`);
+  console.log(
+    `[strava/webhook] Event: ${event.object_type}.${event.aspect_type}` +
+      ` id=${event.object_id} owner=${event.owner_id}`
+  );
+
+  if (isDuplicate(event)) {
+    console.log(`[strava/webhook] Duplicate event — skipping`);
+    return new NextResponse(null, { status: 200 });
+  }
 
   // Look up which RunAI user owns this Strava athlete_id
   const userId = await getUserIdByStravaAthleteId(event.owner_id);
   if (!userId) {
-    console.log(`[strava/webhook] No user found for Strava athlete ${event.owner_id} — ignoring`);
+    console.log(
+      `[strava/webhook] No user found for Strava athlete ${event.owner_id} — ignoring`
+    );
     return new NextResponse(null, { status: 200 });
   }
 
@@ -82,8 +112,14 @@ export async function POST(req: NextRequest) {
 
 // ─── Sync helpers ────────────────────────────────────────────────────────────
 
-async function syncActivity(userId: string, activityId: number, reason: "create" | "update") {
-  console.log(`[strava/webhook] Syncing activity ${activityId} for user ${userId} (${reason})`);
+async function syncActivity(
+  userId: string,
+  activityId: number,
+  reason: "create" | "update"
+) {
+  console.log(
+    `[strava/webhook] Syncing activity ${activityId} for user ${userId} (${reason})`
+  );
 
   const [activity, athlete] = await Promise.all([
     getActivityForUser(userId, activityId),
@@ -95,7 +131,9 @@ async function syncActivity(userId: string, activityId: number, reason: "create"
 
   const filtered = current.recentActivities.filter((a) => a.id !== activity.id);
   const allActivities = [activity, ...filtered].slice(0, 50);
-  const runs = allActivities.filter((a) => a.type === "Run" || a.sport_type === "Run");
+  const runs = allActivities.filter(
+    (a) => a.type === "Run" || a.sport_type === "Run"
+  );
   const computed = computeMetrics(runs, stravaStats);
 
   const updated: StoredStats = {
@@ -109,14 +147,23 @@ async function syncActivity(userId: string, activityId: number, reason: "create"
 
   await writeUserStats(userId, updated);
   revalidatePath("/dashboard");
-  console.log(`[strava/webhook] Updated stats for user ${userId}. Weekly km: ${computed.weeklyKm}`);
+  console.log(
+    `[strava/webhook] Updated stats for user ${userId}. Weekly km: ${computed.weeklyKm}`
+  );
 }
 
 async function removeActivity(userId: string, activityId: number) {
-  console.log(`[strava/webhook] Removing activity ${activityId} for user ${userId}`);
+  console.log(
+    `[strava/webhook] Removing activity ${activityId} for user ${userId}`
+  );
+
   const current = await readUserStats(userId);
-  const allActivities = current.recentActivities.filter((a) => a.id !== activityId);
-  const runs = allActivities.filter((a) => a.type === "Run" || a.sport_type === "Run");
+  const allActivities = current.recentActivities.filter(
+    (a) => a.id !== activityId
+  );
+  const runs = allActivities.filter(
+    (a) => a.type === "Run" || a.sport_type === "Run"
+  );
   const computed = computeMetrics(runs, current.stravaStats);
 
   await writeUserStats(userId, {
@@ -128,5 +175,7 @@ async function removeActivity(userId: string, activityId: number) {
   });
 
   revalidatePath("/dashboard");
+  console.log(
+    `[strava/webhook] Removed activity ${activityId} for user ${userId}. Remaining activities: ${allActivities.length}`
+  );
 }
-

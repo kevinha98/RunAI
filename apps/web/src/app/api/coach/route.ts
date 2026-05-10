@@ -4,7 +4,7 @@ import { MODELS } from "@/lib/llm";
 import { readUserStats } from "@/lib/stats-store";
 import { formatPace } from "@/lib/strava-types";
 import { createClient } from "@/lib/supabase/server";
-import { WEEKS, getCurrentWeek, RACE_DATE } from "@/lib/plan-data";
+import { WEEKS, getCurrentWeek, RACE_DATE, TOTAL_WEEKS } from "@/lib/plan-data";
 import type { StoredStats } from "@/lib/strava-types";
 
 // Allow up to 60 s for the agentic tool loop on Vercel
@@ -46,14 +46,14 @@ const COACH_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_training_plan",
     description:
-      "Henter treningsplanen — enten en spesifikk uke eller gjeldende uke. Bruk dette når brukeren spør om øktene denne uken, vil justere planen, eller spør om hva som kommer fremover.",
+      "Henter treningsplanen — enten en spesifikk uke eller gjeldende uke. Bruk dette når brukeren spør om øktene denne uken, vil justere planen, eller spør om hva som kommer fremover. Send week: -1 for å hente de neste 3 ukene og gi fremoverskuende råd om nedtrapping og toppform.",
     input_schema: {
       type: "object" as const,
       properties: {
         week: {
           type: "number",
           description:
-            "Ukenummer (1-12). Utelat for å hente gjeldende uke. Bruk -1 for å hente de neste 3 ukene.",
+            "Ukenummer (1-52). Utelat eller send 0 for å hente gjeldende uke + de 3 neste. Send -1 for å hente de neste 3 ukene fra gjeldende uke.",
         },
       },
       required: [],
@@ -97,32 +97,91 @@ function executeTool(
     const weeksToShow: number[] = [];
 
     if (requestedWeek === -1) {
-      // Next 3 weeks
-      for (let i = currentWeek; i < currentWeek + 3 && i <= 12; i++) {
+      // Neste 3 uker fra og med gjeldende uke
+      for (let i = currentWeek; i < currentWeek + 3 && i <= TOTAL_WEEKS; i++) {
         weeksToShow.push(i);
       }
-    } else if (requestedWeek && requestedWeek >= 1 && requestedWeek <= 12) {
+    } else if (
+      requestedWeek !== undefined &&
+      requestedWeek >= 1 &&
+      requestedWeek <= TOTAL_WEEKS
+    ) {
       weeksToShow.push(requestedWeek);
     } else {
-      weeksToShow.push(currentWeek);
+      // Standard: gjeldende uke + de 3 neste
+      for (let i = currentWeek; i < currentWeek + 4 && i <= TOTAL_WEEKS; i++) {
+        weeksToShow.push(i);
+      }
     }
 
     const daysUntilRace = Math.ceil(
       (RACE_DATE.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
 
+    const raceDateFormatted = RACE_DATE.toLocaleDateString("nb-NO", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
     const planText = weeksToShow
       .map((wNum) => {
         const w = WEEKS[wNum - 1];
-        if (!w) return `Uke ${wNum}: ikke funnet i planen.`;
+        if (!w) {
+          return `Uke ${wNum}: ikke funnet i planen.`;
+        }
+
+        const isCurrentWeek = wNum === currentWeek;
+        const weekHeader = `=== Uke ${w.week}/${TOTAL_WEEKS} — ${w.phase}${
+          isCurrentWeek ? " (GJELDENDE UKE)" : ""
+        } | Totalt: ${w.totalKm} km ===`;
+
         const sessions = w.sessions
-          .map((s) => `  ${s.day}: ${s.type} — ${s.distance} @ ${s.pace}`)
+          .map((s) => {
+            // Skill mellom beskrivende pace (f.eks. "Restitusjon") og faktisk pace
+            const paceIsDescriptive =
+              s.pace === "Restitusjon" ||
+              s.pace === "Kjerneaktivering" ||
+              s.pace === "Dynamisk" ||
+              s.pace.startsWith("Bein") ||
+              s.pace.startsWith("Full") ||
+              s.distance === "—";
+            const paceStr = paceIsDescriptive
+              ? ` (${s.pace})`
+              : ` @ ${s.pace}`;
+            return `  ${s.day}: ${s.icon} ${s.type} — ${s.distance}${paceStr}`;
+          })
           .join("\n");
-        return `Uke ${w.week} (${w.phase}, ${w.totalKm} km totalt):\n${sessions}`;
+
+        return `${weekHeader}\n${sessions}`;
       })
       .join("\n\n");
 
-    return `Gjeldende uke: ${currentWeek}/12\nDager til Bergen City Marathon: ${daysUntilRace}\n\n${planText}`;
+    // Finn neste nedtrappingsuke
+    const nextTaperWeek = WEEKS.slice(currentWeek).find(
+      (w) => w.phase === "Nedtrapping"
+    );
+    const taperNote = nextTaperWeek
+      ? `Nedtrapping starter uke ${nextTaperWeek.week} (om ${
+          nextTaperWeek.week - currentWeek
+        } uke${nextTaperWeek.week - currentWeek !== 1 ? "r" : ""}).`
+      : "";
+
+    // Fremoverskuende notat om neste uke (hvis ikke allerede vist)
+    const nextWeekNum = currentWeek + 1;
+    const nextWeekData = WEEKS[nextWeekNum - 1];
+    const upcomingNote =
+      nextWeekData && !weeksToShow.includes(nextWeekNum)
+        ? `\nNeste uke (uke ${nextWeekNum}): ${nextWeekData.phase} — ${nextWeekData.totalKm} km planlagt`
+        : "";
+
+    return (
+      `Gjeldende planuke: ${currentWeek}/${TOTAL_WEEKS}\n` +
+      `Dager til Bergen City Marathon (${raceDateFormatted}): ${daysUntilRace}\n` +
+      (taperNote ? `${taperNote}\n` : "") +
+      `\n${planText}` +
+      upcomingNote
+    );
   }
 
   return `Ukjent verktøy: ${name}`;
@@ -225,7 +284,7 @@ function buildRunningHistoryContext(stats: StoredStats): string {
   );
 
   const lines: string[] = [
-    `Gjeldende planuke: ${currentWeekNum}/52 — Fase: ${phase}`,
+    `Gjeldende planuke: ${currentWeekNum}/${TOTAL_WEEKS} — Fase: ${phase}`,
     `Planlagt km denne uken: ${planWeekKm} km`,
     `Faktiske løp siste 7 dager: ${runCountLast7Days} løp — ${kmLast7Days.toFixed(1)} km totalt`,
     `Dager til Bergen City Marathon: ${daysUntilRace}`,
@@ -319,8 +378,7 @@ ${runningHistoryCtx}
 
 <available_tools>
 - get_full_activity_history: Hent full aktivitetslogg (opp til 50 aktiviteter) for dypere analyse
-- get_training_plan: Hent ukesplanen (gjeldende uke, spesifikk uke, eller neste 3 uker)
-Bruk verktøyene proaktivt når spørsmålet krever mer data enn det som er i athlete_data.
+- get_training_plan: Hent ukesplanen (gjeldende uke + 3 neste som standard, spesifikk uke, eller week: -1 for neste 3 uker). Bruk proaktivt når brukeren spør om kommende trening, ukesplan eller treningsbelastning.
 </available_tools>
 
 <coaching_philosophy>
@@ -331,6 +389,7 @@ Bruk verktøyene proaktivt når spørsmålet krever mer data enn det som er i at
 - Bruk format "M:SS/km" for fart
 - Ved skade eller smerte: anbefal hvile og profesjonell vurdering uten å overdramatisere
 - Foreslå konkrete planjusteringer med begrunnelse der det er relevant
+- Bruk get_training_plan automatisk når brukeren spør om ukesplan, kommende økt, treningsbelastning eller fremtidig periodisering
 </coaching_philosophy>`;
 }
 
