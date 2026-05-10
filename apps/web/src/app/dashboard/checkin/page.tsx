@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   ClipboardList,
@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   AlertCircle,
   History,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,19 +75,52 @@ function saveToLocalHistory(entry: HistoryEntry): HistoryEntry[] {
   return updated;
 }
 
-// ─── Markdown renderer (lightweight, no dep needed) ──────────────────────────
+// ─── Markdown renderer ───────────────────────────────────────────────────────
+
+function inlineMd(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-[#111110]">$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>');
+}
 
 function renderMarkdown(text: string): string {
-  return text
-    .replace(/^### (.+)$/gm, "<h3 class=\"text-sm font-bold text-[#111110] mt-5 mb-2\">$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2 class=\"text-base font-bold text-[#111110] mt-6 mb-2\">$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1 class=\"text-lg font-bold text-[#111110] mt-6 mb-3\">$1</h1>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong class=\"font-semibold\">$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em class=\"italic\">$1</em>")
-    .replace(/^- (.+)$/gm, "<li class=\"ml-4 list-disc text-[#3B3B37]\">$1</li>")
-    .replace(/(<li[\s\S]*?<\/li>)/g, "<ul class=\"space-y-1 my-2\">$1</ul>")
-    .replace(/\n{2,}/g, "</p><p class=\"text-[#3B3B37] leading-relaxed mt-3\">")
-    .replace(/^(?!<[hul])(.+)$/gm, "<p class=\"text-[#3B3B37] leading-relaxed\">$1</p>");
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.startsWith("### ")) {
+      out.push(`<h3 class="text-sm font-bold text-[#111110] mt-4 mb-1">${inlineMd(line.slice(4))}</h3>`);
+      i++;
+    } else if (line.startsWith("## ")) {
+      out.push(`<h2 class="text-sm font-bold text-[#111110] mt-5 mb-1">${inlineMd(line.slice(3))}</h2>`);
+      i++;
+    } else if (line.startsWith("# ")) {
+      out.push(`<h2 class="text-base font-bold text-[#111110] mt-5 mb-2">${inlineMd(line.slice(2))}</h2>`);
+      i++;
+    } else if (/^[-*]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*]\s/.test(lines[i])) {
+        items.push(`<li>${inlineMd(lines[i].replace(/^[-*]\s/, ""))}</li>`);
+        i++;
+      }
+      out.push(`<ul class="list-disc list-inside space-y-0.5 my-2 text-[#3B3B37]">${items.join("")}</ul>`);
+    } else if (/^\d+\.\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        items.push(`<li>${inlineMd(lines[i].replace(/^\d+\.\s/, ""))}</li>`);
+        i++;
+      }
+      out.push(`<ol class="list-decimal list-inside space-y-0.5 my-2 text-[#3B3B37]">${items.join("")}</ol>`);
+    } else if (line.trim() === "") {
+      out.push(`<div class="h-2"></div>`);
+      i++;
+    } else {
+      out.push(`<p class="text-[#3B3B37] leading-relaxed">${inlineMd(line)}</p>`);
+      i++;
+    }
+  }
+  return out.join("");
 }
 
 // ─── LocalHistorySection component ───────────────────────────────────────────
@@ -249,6 +284,8 @@ export default function CheckinPage() {
   const [showAdjustments, setShowAdjustments] = useState(false);
   const [localHistory, setLocalHistory] = useState<HistoryEntry[]>([]);
   const [expandedLocalId, setExpandedLocalId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load server history on mount
   useEffect(() => {
@@ -269,6 +306,31 @@ export default function CheckinPage() {
 
   function toggleLocalHistory(id: string) {
     setExpandedLocalId((prev) => (prev === id ? null : id));
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Slette denne rapporten?")) return;
+    setDeletingId(id);
+    try {
+      await fetch(`/api/checkin/${id}`, { method: "DELETE" });
+      setHistory((prev) => prev.filter((h) => h.id !== id));
+      // Also remove from localStorage
+      const updated = loadLocalHistory().filter((h) => h.id !== id);
+      localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(updated));
+      setLocalHistory(updated);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function handleEdit(entry: HistoryEntry) {
+    setReport(entry.user_report);
+    setResult(null);
+    setError(null);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
   }
 
   async function handleSubmit() {
@@ -355,6 +417,7 @@ export default function CheckinPage() {
           Jo mer du deler, jo bedre råd får du.
         </p>
         <textarea
+          ref={textareaRef}
           value={report}
           onChange={(e) => setReport(e.target.value)}
           rows={7}
@@ -510,7 +573,24 @@ export default function CheckinPage() {
 
                   {isExpanded && (
                     <div className="border-t border-[#E5E5E2] px-4 py-4 space-y-4">
-                      {/* Full report */}
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEdit(entry)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E5E2] text-xs font-medium text-[#6B6B65] hover:border-[#FC5200] hover:text-[#FC5200] transition-colors"
+                        >
+                          <Pencil size={11} />
+                          Rediger
+                        </button>
+                        <button
+                          onClick={() => handleDelete(entry.id)}
+                          disabled={deletingId === entry.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E5E2] text-xs font-medium text-[#6B6B65] hover:border-red-400 hover:text-red-500 transition-colors disabled:opacity-40"
+                        >
+                          {deletingId === entry.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                          Slett
+                        </button>
+                      </div>
                       <div>
                         <p className="text-[10px] font-semibold text-[#9B9B95] uppercase tracking-wide mb-1.5">
                           Din rapport

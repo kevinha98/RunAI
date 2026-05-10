@@ -112,3 +112,13 @@ export async function saveCheckin(input: SaveCheckinInput): Promise<WeeklyChecki
     createdAt: data.created_at,
   };
 }
+
+export async function deleteCheckin(userId: string, id: string): Promise<boolean> {
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("weekly_checkins")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", id);
+  return !error;
+}
