@@ -1678,7 +1678,7 @@ export default function DashboardClient({
                     <p className="text-2xl font-black text-[#111110] tabular-nums">
                       {formatPace(paceProgress.currentPaceSec)}
                     </p>
-                    <p className="text-xs text-[#9B9B95]">snitt terskeløkter ({paceProgress.sessionCount})</p>
+                    <p className="text-xs text-[#9B9B95]">siste registrerte terskelfart</p>
                   </div>
                   <div className="text-right">
                     {editingTarget ? (
