@@ -4,6 +4,78 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Brain, Send, ArrowLeft, Loader2 } from "lucide-react";
 
+/** Render markdown-lite: bold, bullet lists, numbered lists, line breaks */
+function MessageContent({ content }: { content: string }) {
+  const lines = content.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  function renderInline(text: string): React.ReactNode {
+    // Bold: **text** or __text__
+    const parts = text.split(/(\*\*.*?\*\*|__.*?__)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith("**") && part.endsWith("**"))
+        return <strong key={idx}>{part.slice(2, -2)}</strong>;
+      if (part.startsWith("__") && part.endsWith("__"))
+        return <strong key={idx}>{part.slice(2, -2)}</strong>;
+      return part;
+    });
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+    // Bullet list
+    if (/^[-*•]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*•]\s/.test(lines[i])) {
+        items.push(lines[i].replace(/^[-*•]\s/, ""));
+        i++;
+      }
+      elements.push(
+        <ul key={`ul-${i}`} className="list-disc list-inside space-y-1 my-1">
+          {items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
+        </ul>
+      );
+      continue;
+    }
+    // Numbered list
+    if (/^\d+\.\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        items.push(lines[i].replace(/^\d+\.\s/, ""));
+        i++;
+      }
+      elements.push(
+        <ol key={`ol-${i}`} className="list-decimal list-inside space-y-1 my-1">
+          {items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
+        </ol>
+      );
+      continue;
+    }
+    // Heading: ### or ##
+    if (/^#{1,3}\s/.test(line)) {
+      elements.push(
+        <p key={`h-${i}`} className="font-semibold mt-2 mb-0.5">
+          {renderInline(line.replace(/^#{1,3}\s/, ""))}
+        </p>
+      );
+      i++;
+      continue;
+    }
+    // Empty line → spacer
+    if (line.trim() === "") {
+      elements.push(<div key={`br-${i}`} className="h-2" />);
+      i++;
+      continue;
+    }
+    // Normal paragraph
+    elements.push(<p key={`p-${i}`}>{renderInline(line)}</p>);
+    i++;
+  }
+
+  return <div className="space-y-0.5">{elements}</div>;
+}
+
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -162,7 +234,11 @@ export default function CoachPage() {
                     : "bg-white border border-[#E5E5E2] text-[#111110]"
                 }`}
               >
-                {message.content || (
+                {message.content ? (
+                  message.role === "assistant"
+                    ? <MessageContent content={message.content} />
+                    : message.content
+                ) : (
                   <span className="flex items-center gap-2 text-[#6B6B65]">
                     <Loader2 size={14} className="animate-spin" />
                     Tenker...
