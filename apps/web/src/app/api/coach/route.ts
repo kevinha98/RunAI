@@ -128,7 +128,82 @@ function executeTool(
   return `Ukjent verktøy: ${name}`;
 }
 
-// ─── Running history context builder ─────────────────────────────────────────
+// ─── Weekly history context builder ──────────────────────────────────────────
+interface WeeklyBucket {
+  weekLabel: string;
+  runs: number;
+  km: number;
+  avgPace: string | null;
+}
+
+interface TrainingContext {
+  currentPlanWeek: number;
+  currentPhase: string;
+  planWeekKm: number;
+  daysToRace: number;
+  last4Weeks: WeeklyBucket[];
+}
+
+function buildWeeklyHistoryContext(stats: StoredStats): TrainingContext {
+  const now = Date.now();
+  const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+  // Finn starten på gjeldende ISO-uke (mandag 00:00)
+  const nowDate = new Date(now);
+  const dayOfWeek = nowDate.getDay(); // 0 = søndag
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const currentWeekStart = new Date(nowDate);
+  currentWeekStart.setHours(0, 0, 0, 0);
+  currentWeekStart.setDate(nowDate.getDate() - daysFromMonday);
+
+  const last4Weeks: WeeklyBucket[] = [];
+
+  for (let offset = 0; offset >= -3; offset--) {
+    const weekStart = new Date(currentWeekStart.getTime() + offset * MS_PER_WEEK);
+    const weekEnd = new Date(weekStart.getTime() + MS_PER_WEEK);
+
+    const weekRuns = stats.recentActivities.filter((a) => {
+      if (a.type !== "Run") return false;
+      const t = new Date(a.start_date_local).getTime();
+      return t >= weekStart.getTime() && t < weekEnd.getTime();
+    });
+
+    const totalKm = weekRuns.reduce((sum, a) => sum + a.distance / 1000, 0);
+    const totalTimeSec = weekRuns.reduce((sum, a) => sum + a.moving_time, 0);
+    const avgPaceSecPerKm = totalKm > 0 ? totalTimeSec / totalKm : null;
+
+    const startLabel = weekStart.toLocaleDateString("nb-NO", {
+      day: "numeric",
+      month: "short",
+    });
+
+    last4Weeks.push({
+      weekLabel: offset === 0 ? `Denne uken (fra ${startLabel})` : `Uke fra ${startLabel}`,
+      runs: weekRuns.length,
+      km: Math.round(totalKm * 10) / 10,
+      avgPace: avgPaceSecPerKm !== null ? formatPace(avgPaceSecPerKm) : null,
+    });
+  }
+
+  const currentWeekNum = getCurrentWeek();
+  const currentWeekData = WEEKS[currentWeekNum - 1];
+  const currentPhase = currentWeekData?.phase ?? "Ukjent fase";
+  const planWeekKm = currentWeekData?.totalKm ?? 0;
+
+  const daysToRace = Math.ceil(
+    (RACE_DATE.getTime() - now) / (1000 * 60 * 60 * 24)
+  );
+
+  return {
+    currentPlanWeek: currentWeekNum,
+    currentPhase,
+    planWeekKm,
+    daysToRace,
+    last4Weeks,
+  };
+}
+
+// ─── Running history context builder (last 7 days detail) ────────────────────
 function buildRunningHistoryContext(stats: StoredStats): string {
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
@@ -219,8 +294,17 @@ function buildSystemPrompt(stats: StoredStats): string {
 
   const runningHistoryCtx = buildRunningHistoryContext(stats);
 
+  // Build structured 4-week training context as compact JSON
+  const trainingContext = buildWeeklyHistoryContext(stats);
+  const trainingContextJson = JSON.stringify(trainingContext);
+
   return `Du er RunAI, en AI-løpecoach drevet av Claude. Du svarer ALLTID på norsk (bokmål).
 Du har dyp ekspertise innen treningsfysiologi, periodisering og løpsprestasjon.
+
+<training_context>
+${trainingContextJson}
+Bruk disse dataene aktivt: henvis til faktiske km-tall, pace og fase når du gir råd. Kommenter trender — f.eks. om km-volumet øker/synker over ukene, om pacetrenden er positiv, og hvor godt gjennomføringen ligger an mot planen. Dager til løpet skal styre råd om belastning og taper.
+</training_context>
 
 <athlete_data>
 Utøver: ${athleteCtx}
