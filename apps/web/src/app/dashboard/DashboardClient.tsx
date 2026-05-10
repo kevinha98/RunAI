@@ -948,10 +948,11 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
 
 // ── Målpace-konstanter og hjelpefunksjoner ──────────────────────────────────
 
-/** Target pace for sub-2:00 Bergen City Halvmaraton: 5:41/km = 341 sek/km */
-const TARGET_PACE_SEC_PER_KM = 341;
-const TARGET_PACE_LABEL = "5:41/km";
-const TARGET_RACE_LABEL = "Sub-2:00 Bergen City Halvmaraton";
+/** Default target pace for sub-2:00 Bergen City Halvmaraton: 5:41/km = 341 sek/km */
+const DEFAULT_TARGET_PACE_SEC = 341;
+const DEFAULT_TARGET_RACE_LABEL = "Sub-2:00 Bergen City Halvmaraton";
+const STORAGE_KEY_TARGET_PACE = "runai-target-pace-sec";
+const STORAGE_KEY_TARGET_RACE = "runai-target-race-label";
 /** Max antall sekunder bak mål som fortsatt gir >0% progress */
 const MAX_DELTA_SEC = 60;
 
@@ -967,7 +968,7 @@ interface PaceProgressResult {
   sessionCount: number;
 }
 
-function computePaceProgress(runs: StravaActivity[]): PaceProgressResult | null {
+function computePaceProgress(runs: StravaActivity[], targetPaceSec: number): PaceProgressResult | null {
   // Only use threshold sessions: name must contain 'terskel' (case-insensitive)
   // Extract pace from the activity name "@m:ss" notation (most reliable — user-stated pace, no GPS noise)
   // Fall back to computed pace (moving_time / distance) if no "@" annotation is present.
@@ -1000,7 +1001,7 @@ function computePaceProgress(runs: StravaActivity[]): PaceProgressResult | null 
 
   const avgSec = paces.reduce((s, p) => s + p, 0) / paces.length;
 
-  const diffSec = avgSec - TARGET_PACE_SEC_PER_KM;
+  const diffSec = avgSec - targetPaceSec;
   const progressPct =
     diffSec <= 0
       ? 100
@@ -1341,6 +1342,47 @@ export default function DashboardClient({
     return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
   });
 
+  // ── Redigerbar målpace ──────────────────────────────────────────────────
+  const [targetPaceSec, setTargetPaceSec] = useState<number>(() => {
+    if (typeof window === "undefined") return DEFAULT_TARGET_PACE_SEC;
+    const raw = localStorage.getItem(STORAGE_KEY_TARGET_PACE);
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return isNaN(n) || n <= 0 ? DEFAULT_TARGET_PACE_SEC : n;
+  });
+  const [targetRaceLabel, setTargetRaceLabel] = useState<string>(() => {
+    if (typeof window === "undefined") return DEFAULT_TARGET_RACE_LABEL;
+    return localStorage.getItem(STORAGE_KEY_TARGET_RACE) ?? DEFAULT_TARGET_RACE_LABEL;
+  });
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [editTargetInput, setEditTargetInput] = useState("");
+  const [editRaceInput, setEditRaceInput] = useState("");
+
+  const targetPaceLabel = (() => {
+    const m = Math.floor(targetPaceSec / 60);
+    const s = targetPaceSec % 60;
+    return `${m}:${String(s).padStart(2, "0")}/km`;
+  })();
+
+  const commitTargetPace = () => {
+    const parts = editTargetInput.trim().split(":");
+    if (parts.length === 2) {
+      const m = parseInt(parts[0], 10);
+      const s = parseInt(parts[1], 10);
+      if (!isNaN(m) && !isNaN(s) && s >= 0 && s < 60 && m > 0) {
+        const sec = m * 60 + s;
+        setTargetPaceSec(sec);
+        try { localStorage.setItem(STORAGE_KEY_TARGET_PACE, String(sec)); } catch { /* ignore */ }
+      }
+    }
+    const newRaceLabel = editRaceInput.trim();
+    if (newRaceLabel) {
+      setTargetRaceLabel(newRaceLabel);
+      try { localStorage.setItem(STORAGE_KEY_TARGET_RACE, newRaceLabel); } catch { /* ignore */ }
+    }
+    setEditingTarget(false);
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<EditableSession>>({});
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1395,7 +1437,7 @@ export default function DashboardClient({
   const planSessions = useMemo(() => getPlanSessions(recentRuns), [recentRuns]);
   const weeklyBuckets = useMemo(() => weeklyKmBuckets(recentRuns, 8), [recentRuns]);
   const personalBests = useMemo(() => computePersonalBests(recentRuns), [recentRuns]);
-  const paceProgress = useMemo(() => computePaceProgress(recentRuns), [recentRuns]);
+  const paceProgress = useMemo(() => computePaceProgress(recentRuns, targetPaceSec), [recentRuns, targetPaceSec]);
   const marathonProgress = useMemo(() => getMarathonProgress(), []);
 
   const weeklyPlanKm = getWeeklyPlanKm();
@@ -1578,8 +1620,47 @@ export default function DashboardClient({
                     <p className="text-xs text-[#9B9B95]">snitt terskeløkter ({paceProgress.sessionCount})</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-[#6B6B65]">{TARGET_PACE_LABEL}</p>
-                    <p className="text-[10px] text-[#9B9B95]">{TARGET_RACE_LABEL}</p>
+                    {editingTarget ? (
+                      <div className="flex flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={editTargetInput}
+                            onChange={(e) => setEditTargetInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") commitTargetPace(); if (e.key === "Escape") setEditingTarget(false); }}
+                            placeholder="m:ss"
+                            maxLength={5}
+                            className="w-16 text-right text-xs font-semibold border border-[#FC5200] rounded-lg px-2 py-1 focus:outline-none bg-white"
+                            autoFocus
+                          />
+                          <span className="text-xs text-[#9B9B95]">/km</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={editRaceInput}
+                          onChange={(e) => setEditRaceInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") commitTargetPace(); if (e.key === "Escape") setEditingTarget(false); }}
+                          placeholder="Løpsmål"
+                          className="w-44 text-right text-[10px] border border-[#E5E5E2] rounded-lg px-2 py-1 focus:outline-none bg-white"
+                        />
+                        <div className="flex gap-1">
+                          <button onClick={commitTargetPace} className="text-[10px] font-semibold text-white bg-[#FC5200] rounded-lg px-2 py-0.5 hover:bg-[#e04a00]">Lagre</button>
+                          <button onClick={() => setEditingTarget(false)} className="text-[10px] text-[#9B9B95] hover:text-[#6B6B65] px-1">Avbryt</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setEditTargetInput(targetPaceLabel.replace("/km", "")); setEditRaceInput(targetRaceLabel); setEditingTarget(true); }}
+                        className="text-right group"
+                        title="Klikk for å endre målpace"
+                      >
+                        <p className="text-sm font-semibold text-[#6B6B65] group-hover:text-[#FC5200] transition-colors flex items-center gap-1 justify-end">
+                          {targetPaceLabel}
+                          <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+                        </p>
+                        <p className="text-[10px] text-[#9B9B95]">{targetRaceLabel}</p>
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="w-full h-2.5 bg-[#F0F0EE] rounded-full overflow-hidden">
