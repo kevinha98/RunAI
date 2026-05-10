@@ -1499,7 +1499,7 @@ export default function DashboardClient({
             )}
 
             {/* Halvmaraton-estimat trend */}
-            <HalfMarathonTrendCard activities={allActivities} />
+            <HalfMarathonTrendCard activities={recentActivities} />
 
             {/* PR-kort */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
