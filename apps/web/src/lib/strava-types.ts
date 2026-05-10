@@ -123,6 +123,54 @@ export function computePaceZoneDistribution(
   }));
 }
 
+/**
+ * Formats a pace zone distribution as a human-readable percentage summary.
+ * Only zones with at least one run are included.
+ * Zones are listed in order from Lett → VO2max.
+ *
+ * @param distribution - Output from computePaceZoneDistribution()
+ * @returns E.g. '60% Lett · 25% Moderat · 15% Terskel'
+ *
+ * @example
+ * const dist = computePaceZoneDistribution(runs, avgPace);
+ * formatZoneSummary(dist); // '60% Lett · 25% Moderat · 15% Terskel'
+ */
+export function formatZoneSummary(distribution: ZoneDistribution[]): string {
+  const parts = distribution
+    .filter((entry) => entry.count > 0)
+    .map((entry) => `${entry.percentage}% ${entry.zone.label}`);
+
+  return parts.length > 0 ? parts.join(' · ') : 'Ingen løpsdata';
+}
+
+/**
+ * Summarizes pace zone distribution as a human-readable percentage string
+ * intended for use in AI coach system prompts to convey training balance
+ * without sending raw activity data.
+ *
+ * Only zones with at least one run are included, listed in order Lett → VO2max
+ * (order is preserved from computePaceZoneDistribution).
+ * Zone labels are lowercase for natural Norwegian sentence flow.
+ *
+ * @param distribution - Output from computePaceZoneDistribution()
+ * @returns E.g. '60% lett, 25% moderat, 15% terskel'
+ *
+ * @example
+ * const dist = computePaceZoneDistribution(runs, avgPace);
+ * summarizePaceZones(dist); // '60% lett, 25% moderat, 15% terskel'
+ */
+export function summarizePaceZones(distribution: ZoneDistribution[]): string {
+  if (!distribution || distribution.length === 0) {
+    return 'ingen løpsdata tilgjengelig';
+  }
+
+  const parts = distribution
+    .filter((entry) => entry.count > 0)
+    .map((entry) => `${entry.percentage}% ${entry.zone.label.toLowerCase()}`);
+
+  return parts.length > 0 ? parts.join(', ') : 'ingen løpsdata tilgjengelig';
+}
+
 // ─── HR Zone Types ───────────────────────────────────────────────────────────
 
 export type HRZoneLabel =
