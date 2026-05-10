@@ -1144,83 +1144,54 @@ function HalfMarathonTrendCard({
   // Ankerpunkt 0: basert på 5K PR → Cameron HM-estimat (mai 2026)
   // Ankerpunkt 1: basert på nåværende terskelfart som en 5 km @ pace (jun 2026)
   // Disse gir en startlinje trendlinja kan strekkes fra.
-  const syntheticPoints = useMemo((): HMMonthPoint[] => {
-    const pts: HMMonthPoint[] = [];
-    if (fiveKmPrSec && fiveKmPrSec > 0) {
-      const hmEst = cameronPredict(fiveKmPrSec, 5000, DIST.HALF_MARATHON);
-      pts.push({ monthKey: "2026-05", label: "5K PR", hmSec: hmEst, monthIndex: 0 });
-    }
-    if (thresholdPaceSec && thresholdPaceSec > 0) {
-      const notionalTime = thresholdPaceSec * 5;
-      const hmEst = cameronPredict(notionalTime, 5000, DIST.HALF_MARATHON);
-      pts.push({ monthKey: "2026-06", label: "Terskel", hmSec: hmEst, monthIndex: 1 });
-    }
-    return pts;
-  }, [fiveKmPrSec, thresholdPaceSec]);
+  // Plan-baserte manedspunkt (treningsprogrammets tempoplan)
+  // Terskelfart forbedres lineaert fra naavaerende -> 4:35/km (apr 2027)
+  // HM-estimat: terskel x 21,097 km x 1,055 (HM-tempo er ~5,5% tregere enn terskel)
+  const PLAN_MONTH_LABELS = ["mai", "jun", "jul", "aug", "sep", "okt", "nov", "des", "jan", "feb", "mar", "apr"];
+  const PLAN_END_THRESH_SEC = 4 * 60 + 35; // 4:35/km
+  const planPoints = useMemo((): HMMonthPoint[] => {
+    const startSec = (thresholdPaceSec && thresholdPaceSec > 0) ? thresholdPaceSec : (5 * 60 + 20);
+    return PLAN_MONTH_LABELS.map((label, i) => {
+      const fraction = i / (PLAN_MONTH_LABELS.length - 1);
+      const monthThreshSec = startSec + (PLAN_END_THRESH_SEC - startSec) * fraction;
+      const hmSec = Math.round(monthThreshSec * 21.097 * 1.055);
+      const month = i <= 7 ? i + 5 : i - 7;
+      const year = i <= 7 ? 2026 : 2027;
+      const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+      return { monthKey, label, hmSec, monthIndex: i };
+    });
+  }, [thresholdPaceSec]);
 
-  const usingSynthetic = realPoints.length < 2;
-  const points = usingSynthetic && syntheticPoints.length >= 2 ? syntheticPoints : realPoints;
-  // ─────────────────────────────────────────────────────────────────────────
+  const hasReal = realPoints.length >= 1;
+  const currentBestSec = hasReal
+    ? Math.min(...realPoints.map(p => p.hmSec))
+    : (planPoints.length > 0 ? planPoints[0].hmSec : null);
+  const raceProjectionSec = planPoints.length > 0 ? planPoints[planPoints.length - 1].hmSec : null;
+  const improving = planPoints.length >= 2 && planPoints[planPoints.length - 1].hmSec < planPoints[0].hmSec;
+  const SHOW_X_LABELS = [0, 2, 4, 6, 8, 10, 11];
 
-  const regression = useMemo(() => hmRegression(points), [points]);
-
-  const raceMonthIndex = useMemo(() => {
-    if (!points.length) return null;
-    const [fy, fm] = points[0].monthKey.split("-").map(Number);
-    return (2027 - fy) * 12 + (4 - fm);
-  }, [points]);
-
-  const raceDayProjection = useMemo(() => {
-    if (!regression || raceMonthIndex === null) return null;
-    const raw = regression.intercept + regression.slope * raceMonthIndex;
-    return Math.max(3600, Math.min(14400, raw));
-  }, [regression, raceMonthIndex]);
-
-  const currentBest = useMemo(
-    () => (points.length ? Math.min(...points.map(p => p.hmSec)) : null),
-    [points]
-  );
-
-  if (points.length < 2) {
+  if (planPoints.length === 0) {
     return (
-      <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
+      <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5">
         <div className="flex items-center gap-2 mb-2">
           <Timer className="w-4 h-4 text-[#FC5200] shrink-0" />
           <h3 className="text-sm font-bold text-[#111110]">Halvmaraton-estimat</h3>
         </div>
-        <p className="text-xs text-[#9B9B95] italic">
-          Legg inn 5K personrekord eller logg terskeløkter for å se estimat.
-        </p>
+        <p className="text-xs text-[#9B9B95] italic">Legg inn terskeloekter for aa se estimat.</p>
       </div>
     );
   }
 
-  const W = 300; const H = 80; const PAD_R = 38;
-  const chartW = W - PAD_R;
-  const xMax = raceMonthIndex ?? points[points.length - 1].monthIndex;
-  const xScale = (idx: number) => (idx / Math.max(xMax, 1)) * chartW;
-
-  const yVals = [
-    ...points.map(p => p.hmSec),
-    ...(raceDayProjection ? [raceDayProjection] : []),
-  ];
-  const yMin = Math.min(...yVals) - 360; // 6 min buffer
-  const yMax_ = Math.max(...yVals) + 360;
-  // Lower seconds = faster = higher on chart (lower SVG y)
-  const yScale = (s: number) => ((s - yMin) / (yMax_ - yMin)) * H;
-
-  const pathD = points
+  const W = 300; const H = 80; const PAD_B = 24;
+  const xTotal = planPoints.length - 1;
+  const allHMSec = [...planPoints.map(p => p.hmSec), ...(hasReal ? realPoints.map(p => p.hmSec) : [])];
+  const yMin = Math.min(...allHMSec) - 300;
+  const yMax_ = Math.max(...allHMSec) + 300;
+  const xScale = (idx: number) => (idx / xTotal) * W;
+  const yScale = (s: number) => H - ((s - yMin) / (yMax_ - yMin)) * H;
+  const planPathD = planPoints
     .map((p, i) => `${i === 0 ? "M" : "L"}${xScale(p.monthIndex).toFixed(1)},${yScale(p.hmSec).toFixed(1)}`)
     .join(" ");
-  const lastPt = points[points.length - 1];
-  const areaD = `${pathD} L${xScale(lastPt.monthIndex).toFixed(1)},${H} L${xScale(0).toFixed(1)},${H} Z`;
-
-  const improving = regression !== null && regression.slope < 0;
-  const trendX1 = xScale(points[0].monthIndex);
-  const trendY1 = regression ? yScale(regression.intercept) : 0;
-  const trendX2 = raceMonthIndex !== null ? xScale(raceMonthIndex) : xScale(lastPt.monthIndex);
-  const trendY2 = raceDayProjection ? yScale(raceDayProjection) : trendY1;
-  const trendColor = improving ? "#10b981" : "#f59e0b";
 
   return (
     <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
@@ -1234,18 +1205,16 @@ function HalfMarathonTrendCard({
 
       <div className="flex items-end gap-5 mb-3">
         <div>
-          <p className="text-[10px] text-[#9B9B95] uppercase tracking-wide mb-0.5">Nåværende beste</p>
+          <p className="text-[10px] text-[#9B9B95] uppercase tracking-wide mb-0.5">{hasReal ? "Nåværende beste" : "Nå (estimert)"}</p>
           <p className="text-2xl font-black text-[#FC5200] tabular-nums leading-tight">
-            {formatTime(Math.round(currentBest!))}
+            {currentBestSec ? formatTime(Math.round(currentBestSec)) : "—"}
           </p>
         </div>
-        {raceDayProjection && (
+        {raceProjectionSec && (
           <div>
-            <p className="text-[10px] text-[#9B9B95] uppercase tracking-wide mb-0.5">Prediksjon apr 2027</p>
-            <p className={`text-xl font-bold tabular-nums leading-tight ${
-              improving ? "text-emerald-600" : "text-amber-600"
-            }`}>
-              {formatTime(Math.round(raceDayProjection))}
+            <p className="text-[10px] text-[#9B9B95] uppercase tracking-wide mb-0.5">Mål apr 2027</p>
+            <p className="text-xl font-bold tabular-nums leading-tight text-emerald-600">
+              {formatTime(Math.round(raceProjectionSec))}
             </p>
           </div>
         )}
@@ -1256,66 +1225,53 @@ function HalfMarathonTrendCard({
               : "bg-amber-50 text-amber-700 border-amber-200"
           }`}>
             {improving ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {improving ? "Forbedring" : "Tilbakegang"}
+            {improving ? "Planlagt forbedring" : "Sjekk plan"}
           </span>
         </div>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full" style={{ overflow: "visible" }}>
+      <svg viewBox={`0 0 ${W} ${H + PAD_B}`} className="w-full" style={{ overflow: "visible" }}>
         <defs>
-          <linearGradient id="hmAreaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={STRAVA_ORANGE} stopOpacity="0.12" />
-            <stop offset="100%" stopColor={STRAVA_ORANGE} stopOpacity="0" />
+          <linearGradient id="hmPlanGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <path d={areaD} fill="url(#hmAreaGrad)" />
-        {/* Trend projection */}
-        {regression && (
-          <line x1={trendX1} y1={trendY1} x2={trendX2} y2={trendY2}
-            stroke={trendColor} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.65} />
-        )}
-        {/* Race date marker */}
-        {raceMonthIndex !== null && (
-          <>
-            <line x1={xScale(raceMonthIndex)} y1={0} x2={xScale(raceMonthIndex)} y2={H}
-              stroke="#FC5200" strokeWidth={1} strokeDasharray="3 2" opacity={0.3} />
-            <text x={xScale(raceMonthIndex) + 2} y={9} fontSize={6.5} fill="#FC5200" opacity={0.55}>BCM 27</text>
-          </>
-        )}
-        {/* Actual line */}
-        <path d={pathD} stroke={STRAVA_ORANGE} strokeWidth="2" fill="none"
+        <path
+          d={`${planPathD} L${xScale(xTotal).toFixed(1)},${H} L${xScale(0).toFixed(1)},${H} Z`}
+          fill="url(#hmPlanGrad)"
+        />
+        <path d={planPathD} stroke="#10b981" strokeWidth="2" fill="none"
           strokeLinejoin="round" strokeLinecap="round" />
-        {/* Dots + tooltips */}
-        {points.map((p, i) => {
+        <line x1={xScale(0)} y1={0} x2={xScale(0)} y2={H}
+          stroke="#FC5200" strokeWidth={1} strokeDasharray="3 2" opacity={0.4} />
+        <line x1={xScale(xTotal)} y1={0} x2={xScale(xTotal)} y2={H}
+          stroke="#FC5200" strokeWidth={1} strokeDasharray="3 2" opacity={0.25} />
+        <text x={xScale(xTotal) - 2} y={9} fontSize={6.5} fill="#FC5200" opacity={0.55} textAnchor="end">BCM</text>
+        {planPoints.map((p, i) => {
           const cx = xScale(p.monthIndex);
           const cy = yScale(p.hmSec);
           const isH = hoveredIdx === i;
-          const TW = 96; const TH = 38;
-          const tx = Math.min(cx, W - PAD_R - TW - 2);
-          const ty = Math.max(2, cy - TH - 6);
+          const TW = 88; const TH = 36;
+          const tx = Math.min(Math.max(cx - TW / 2, 2), W - TW - 2);
+          const ty = Math.max(2, cy - TH - 8);
           return (
-            <g key={i}>
-              <circle cx={cx} cy={cy} r={9} fill="transparent"
+            <g key={`plan-${i}`}>
+              <circle cx={cx} cy={cy} r={10} fill="transparent"
                 onMouseEnter={() => setHoveredIdx(i)} onMouseLeave={() => setHoveredIdx(null)}
                 style={{ cursor: "pointer" }} />
               <circle cx={cx} cy={cy} r={isH ? 4 : 2.5}
-                fill="white" stroke={STRAVA_ORANGE} strokeWidth={isH ? 2 : 1.5}
-                strokeDasharray={usingSynthetic ? "2 2" : undefined}
-                opacity={usingSynthetic ? 0.6 : 1}
+                fill="white" stroke="#10b981" strokeWidth={isH ? 2 : 1.5}
                 style={{ pointerEvents: "none" }} />
-              {(i === 0 || i === points.length - 1) && (
-                <text x={cx} y={H + 13} textAnchor="middle" fontSize={7} fill="#9B9B95"
-                  style={{ pointerEvents: "none" }}>{p.label}</text>
-              )}
               {isH && (
                 <g style={{ pointerEvents: "none" }}>
                   <rect x={tx} y={ty} width={TW} height={TH}
                     rx={4} fill="white" stroke="#E5E5E2" strokeWidth={1}
                     style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.08))" }} />
-                  <text x={tx + TW / 2} y={ty + 12} textAnchor="middle" fontSize={7.5} fill="#6B6B65" fontWeight="600">
-                    {p.label}
+                  <text x={tx + TW / 2} y={ty + 13} textAnchor="middle" fontSize={7.5} fill="#6B6B65" fontWeight="600">
+                    {p.label} {p.monthKey.split("-")[0]}
                   </text>
-                  <text x={tx + TW / 2} y={ty + 28} textAnchor="middle" fontSize={11} fontWeight="bold" fill={STRAVA_ORANGE}>
+                  <text x={tx + TW / 2} y={ty + 27} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#10b981">
                     {formatTime(Math.round(p.hmSec))}
                   </text>
                 </g>
@@ -1323,17 +1279,30 @@ function HalfMarathonTrendCard({
             </g>
           );
         })}
-        {/* Projected race-day dot */}
-        {raceDayProjection && raceMonthIndex !== null && (
-          <circle cx={trendX2} cy={trendY2} r={3}
-            fill="white" stroke={trendColor} strokeWidth={2}
-            style={{ pointerEvents: "none" }} />
+        {hasReal && realPoints.map((p, i) => {
+          const cx = xScale(Math.min(p.monthIndex, xTotal));
+          const cy = yScale(p.hmSec);
+          return (
+            <g key={`real-${i}`}>
+              <circle cx={cx} cy={cy} r={4}
+                fill={STRAVA_ORANGE} stroke="white" strokeWidth={1.5}
+                style={{ pointerEvents: "none" }} />
+            </g>
+          );
+        })}
+        {planPoints.map((p, i) =>
+          SHOW_X_LABELS.includes(i) ? (
+            <text key={`lbl-${i}`} x={xScale(p.monthIndex)} y={H + PAD_B - 2}
+              textAnchor="middle" fontSize={7} fill="#9B9B95">
+              {p.label}
+            </text>
+          ) : null
         )}
       </svg>
       <p className="text-[9px] text-[#9B9B95] mt-0.5 leading-tight">
-        {usingSynthetic
-          ? "Estimert fra 5K PR og terskelfart · Oppdateres med faktiske terskeløkter"
-          : "Beste Cameron-estimat per måned · Stiplet linje = trend mot Bergen City Halvmaraton apr 2027"}
+        {hasReal
+          ? "?? Faktiske terskeloekter · ?? Treningsplan-prediksjon mot Bergen City Halvmaraton apr 2027"
+          : "Treningsplan-prediksjon: terskelfart 5:20→4:35/km · Oppdateres med faktiske terskeloekter"}
       </p>
     </div>
   );
