@@ -470,11 +470,15 @@ export interface PersonalBestEntry {
 }
 
 export interface PersonalBests {
-  /** Fastest run with distance within ±15% of 5 000 m (4 250–5 750 m) */
-  fiveKm: PersonalBestEntry | null;
-  /** Fastest run with distance within ±15% of 10 000 m (8 500–11 500 m) */
-  tenKm: PersonalBestEntry | null;
-  /** Distance of the longest single run in kilometres */
+  /** Fastest moving_time (seconds) for 5 km runs. 0 if no qualifying run. */
+  fiveKm: number;
+  /** ISO date of the 5 km PR run. Empty string if no qualifying run. */
+  fiveKmDate: string;
+  /** Fastest moving_time (seconds) for 10 km runs. 0 if no qualifying run. */
+  tenKm: number;
+  /** ISO date of the 10 km PR run. Empty string if no qualifying run. */
+  tenKmDate: string;
+  /** Distance of the longest single run in kilometres. 0 if no runs. */
   longestKm: number;
 }
 
@@ -498,8 +502,10 @@ export function computePersonalBests(runs: StravaActivity[]): PersonalBests {
   const tenKmLow   = TEN_KM  * (1 - TOLERANCE);  // 8 500
   const tenKmHigh  = TEN_KM  * (1 + TOLERANCE);  // 11 500
 
-  let fiveBest: PersonalBestEntry | null = null;
-  let tenBest: PersonalBestEntry | null = null;
+  let fiveBestTime = 0;
+  let fiveBestDate = '';
+  let tenBestTime = 0;
+  let tenBestDate = '';
   let longestM = 0;
 
   for (const run of runs) {
@@ -518,22 +524,26 @@ export function computePersonalBests(runs: StravaActivity[]): PersonalBests {
 
     // 5 km PR — fastest (lowest moving_time)
     if (dist >= fiveKmLow && dist <= fiveKmHigh) {
-      if (fiveBest === null || time < fiveBest.time) {
-        fiveBest = { time, date };
+      if (fiveBestTime === 0 || time < fiveBestTime) {
+        fiveBestTime = time;
+        fiveBestDate = date;
       }
     }
 
     // 10 km PR — fastest (lowest moving_time)
     if (dist >= tenKmLow && dist <= tenKmHigh) {
-      if (tenBest === null || time < tenBest.time) {
-        tenBest = { time, date };
+      if (tenBestTime === 0 || time < tenBestTime) {
+        tenBestTime = time;
+        tenBestDate = date;
       }
     }
   }
 
   return {
-    fiveKm: fiveBest,
-    tenKm: tenBest,
+    fiveKm: fiveBestTime,
+    fiveKmDate: fiveBestDate,
+    tenKm: tenBestTime,
+    tenKmDate: tenBestDate,
     longestKm: Math.round((longestM / 1000) * 100) / 100,
   };
 }

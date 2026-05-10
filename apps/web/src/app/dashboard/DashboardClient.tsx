@@ -1263,17 +1263,16 @@ export default function DashboardClient({
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {([
-                      { label: "5 km", key: "fiveKm" as const },
-                      { label: "10 km", key: "tenKm" as const },
-                    ] as { label: string; key: keyof typeof personalBests }[]).map(({ label, key }) => {
-                      const pr = personalBests[key] as { time: number; date: string } | null;
+                      { label: "5 km", time: personalBests.fiveKm, date: personalBests.fiveKmDate },
+                      { label: "10 km", time: personalBests.tenKm, date: personalBests.tenKmDate },
+                    ]).map(({ label, time, date }) => {
                       return (
-                        <div key={key} className="bg-[#F8F8F7] rounded-xl p-3">
+                        <div key={label} className="bg-[#F8F8F7] rounded-xl p-3">
                           <p className="text-[10px] text-[#9B9B95] mb-1">{label}</p>
-                          {pr ? (
+                          {time > 0 ? (
                             <>
-                              <p className="text-sm font-bold tabular-nums">{formatPRTime(pr.time)}</p>
-                              <p className="text-[10px] text-[#6B6B65] mt-0.5">{formatDate(pr.date)}</p>
+                              <p className="text-sm font-bold tabular-nums">{formatPRTime(time)}</p>
+                              <p className="text-[10px] text-[#6B6B65] mt-0.5">{formatDate(date)}</p>
                             </>
                           ) : (
                             <p className="text-sm font-semibold text-[#C8C8C4]">—</p>
