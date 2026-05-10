@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import type { StoredStats, StravaActivity } from "@/lib/strava-types";
 import { formatPace, computePaceZoneDistribution, computePersonalBests } from "@/lib/strava-types";
-import { getCurrentWeek, WEEKS, PLAN_START, RACE_DATE as RACE_DATE_OBJ } from "@/lib/plan-data";
+import { getCurrentWeek, WEEKS, PLAN_START, RACE_DATE as RACE_DATE_OBJ, TOTAL_WEEKS } from "@/lib/plan-data";
 import type { Phase, Week } from "@/lib/plan-data";
 import { cameronPredict, DIST, formatTime } from "@/lib/race-predictor";
 
@@ -946,6 +946,17 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
   );
 }
 
+// ── Aktivitetstype-konstanter ────────────────────────────────────────────────
+const ACTIVITY_TYPES = ["Styrke", "Rolig jogg", "Intervaller", "Terskelintervaller", "Terskeløkt", "Langtur", "Hvile"] as const;
+type ActivityType = typeof ACTIVITY_TYPES[number];
+const ICON_FOR_TYPE: Record<ActivityType, string> = {
+  "Styrke": "💪", "Rolig jogg": "🏃", "Intervaller": "🔥",
+  "Terskelintervaller": "⚡", "Terskeløkt": "⚡", "Langtur": "🛣️", "Hvile": "😴",
+};
+function iconForType(t: string): string {
+  return ICON_FOR_TYPE[t as ActivityType] ?? "🏃";
+}
+
 // ── Målpace-konstanter og hjelpefunksjoner ──────────────────────────────────
 
 /** Default target pace for sub-2:00 Bergen City Halvmaraton: 5:41/km = 341 sek/km */
@@ -1350,30 +1361,36 @@ export default function DashboardClient({
     distance: string;
     pace: string;
     icon: string;
-    isCustom?: boolean;
   };
 
   const currentWeekNum = getCurrentWeek();
-  const baseWeekData = WEEKS.find((w) => w.week === currentWeekNum) ?? WEEKS[0];
-  const storageKey = `runai-week-${currentWeekNum}-sessions`;
+  const [viewingWeek, setViewingWeek] = useState(currentWeekNum);
+  const viewingWeekData = WEEKS.find((w) => w.week === viewingWeek) ?? WEEKS[0];
 
-  const loadSessions = (): EditableSession[] => {
-    if (typeof window === "undefined") return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) return JSON.parse(raw) as EditableSession[];
-    } catch { /* ignore */ }
-    return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
+  const weekStorageKey = (wk: number) => `runai-week-${wk}-sessions-v2`;
+
+  const blankTemplate = (weekNum: number): EditableSession[] => {
+    const wd = WEEKS.find((w) => w.week === weekNum) ?? WEEKS[0];
+    return wd.sessions.map((s, i) => ({
+      id: `w${weekNum}-${i}`,
+      day: s.day,
+      type: s.type,
+      distance: "",
+      pace: "",
+      icon: iconForType(s.type),
+    }));
   };
 
-  const [weekSessions, setWeekSessions] = useState<EditableSession[]>(() => {
-    if (typeof window === "undefined") return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
+  const loadWeekSessions = (wk: number): EditableSession[] => {
+    if (typeof window === "undefined") return blankTemplate(wk);
     try {
-      const raw = localStorage.getItem(storageKey);
+      const raw = localStorage.getItem(weekStorageKey(wk));
       if (raw) return JSON.parse(raw) as EditableSession[];
     } catch { /* ignore */ }
-    return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
-  });
+    return blankTemplate(wk);
+  };
+
+  const [weekSessions, setWeekSessions] = useState<EditableSession[]>(() => loadWeekSessions(currentWeekNum));
 
   // ── Redigerbar målpace ──────────────────────────────────────────────────
   const [targetPaceSec, setTargetPaceSec] = useState<number>(() => {
@@ -1421,25 +1438,39 @@ export default function DashboardClient({
   const [showAddForm, setShowAddForm] = useState(false);
   const [newSession, setNewSession] = useState<Omit<EditableSession, "id">>({
     day: "Man",
-    type: "",
+    type: "Rolig jogg",
     distance: "",
     pace: "",
-    icon: "🏃",
+    icon: iconForType("Rolig jogg"),
   });
+
+  const navigateWeek = (delta: number) => {
+    const next = Math.max(1, Math.min(TOTAL_WEEKS, viewingWeek + delta));
+    setViewingWeek(next);
+    setWeekSessions(loadWeekSessions(next));
+    setEditingId(null);
+    setEditDraft({});
+    setShowAddForm(false);
+  };
 
   const saveSessions = (sessions: EditableSession[]) => {
     setWeekSessions(sessions);
-    try { localStorage.setItem(storageKey, JSON.stringify(sessions)); } catch { /* ignore */ }
+    try { localStorage.setItem(weekStorageKey(viewingWeek), JSON.stringify(sessions)); } catch { /* ignore */ }
   };
 
   const startEdit = (s: EditableSession) => {
+    setShowAddForm(false);
     setEditingId(s.id);
     setEditDraft({ day: s.day, type: s.type, distance: s.distance, pace: s.pace, icon: s.icon });
   };
 
   const commitEdit = () => {
     if (!editingId) return;
-    saveSessions(weekSessions.map((s) => s.id === editingId ? { ...s, ...editDraft } : s));
+    saveSessions(weekSessions.map((s) =>
+      s.id === editingId
+        ? { ...s, ...editDraft, icon: iconForType(editDraft.type ?? s.type) }
+        : s
+    ));
     setEditingId(null);
     setEditDraft({});
   };
@@ -1450,16 +1481,13 @@ export default function DashboardClient({
 
   const addSession = () => {
     if (!newSession.type.trim()) return;
-    const s: EditableSession = { ...newSession, id: `custom-${Date.now()}`, isCustom: true };
+    const s: EditableSession = { ...newSession, id: `custom-${Date.now()}` };
     saveSessions([...weekSessions, s]);
-    setNewSession({ day: "Man", type: "", distance: "", pace: "", icon: "🏃" });
+    setNewSession({ day: "Man", type: "Rolig jogg", distance: "", pace: "", icon: iconForType("Rolig jogg") });
     setShowAddForm(false);
   };
 
-  const resetToDefault = () => {
-    const defaults = baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
-    saveSessions(defaults);
-  };
+  const resetToDefault = () => saveSessions(blankTemplate(viewingWeek));
   // ────────────────────────────────────────────────────────────────────────
 
   const recentRuns = stravaData.recentRuns ?? [];
@@ -1777,34 +1805,59 @@ export default function DashboardClient({
         {/* ── Tab: Økter ── */}
         {activeTab === "okter" && (
           <div>
-            {/* Ukens plan — redigerbar */}
-            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
+            {/* Ukens plan — redigerbar med vekenavigasjon */}
+            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5">
+              {/* Vekenavigasjon */}
               <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold text-[#111110]">
-                  Uke {currentWeekNum} – {baseWeekData.phase}
-                </h3>
+                <button
+                  onClick={() => navigateWeek(-1)}
+                  disabled={viewingWeek <= 1}
+                  className="p-1.5 rounded-lg hover:bg-[#F0F0EE] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4 text-[#6B6B65] rotate-180" />
+                </button>
+                <div className="text-center">
+                  <h3 className="text-sm font-bold text-[#111110]">
+                    Uke {viewingWeek} – {viewingWeekData.phase}
+                    {viewingWeek === currentWeekNum && (
+                      <span className="ml-2 text-[10px] font-semibold text-[#FC5200] bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">Nå</span>
+                    )}
+                  </h3>
+                  <p className="text-[10px] text-[#9B9B95]">
+                    {viewingWeekData.totalKm} km planlagt · {viewingWeek}/{TOTAL_WEEKS} uker
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigateWeek(1)}
+                  disabled={viewingWeek >= TOTAL_WEEKS}
+                  className="p-1.5 rounded-lg hover:bg-[#F0F0EE] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4 text-[#6B6B65]" />
+                </button>
+              </div>
+
+              <div className="flex justify-end mb-3">
                 <button
                   onClick={resetToDefault}
                   className="text-[10px] text-[#9B9B95] hover:text-[#6B6B65] underline"
-                  title="Tilbakestill til programmet"
                 >
-                  Nullstill
+                  Nullstill uke
                 </button>
               </div>
-              <p className="text-[10px] text-[#9B9B95] mb-3">
-                Plan: {baseWeekData.totalKm} km · Fra halvmaraton_program_fullstendig.txt
-              </p>
 
-              <PhaseCompletionBadge recentRuns={recentRuns} />
+              {viewingWeek === currentWeekNum && <PhaseCompletionBadge recentRuns={recentRuns} />}
 
               <div className="space-y-2">
                 {weekSessions.map((session) => {
-                  const done = isSessionDone(session.day, recentRuns);
+                  const done = viewingWeek === currentWeekNum && isSessionDone(session.day, recentRuns);
                   const isEditing = editingId === session.id;
 
                   if (isEditing) {
                     return (
                       <div key={session.id} className="rounded-xl border border-[#FC5200] bg-orange-50 p-3 space-y-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">{iconForType(editDraft.type ?? session.type)}</span>
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Dag</label>
@@ -1819,27 +1872,17 @@ export default function DashboardClient({
                             </select>
                           </div>
                           <div>
-                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Ikon</label>
+                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type aktivitet</label>
                             <select
-                              value={editDraft.icon ?? session.icon}
-                              onChange={(e) => setEditDraft((d) => ({ ...d, icon: e.target.value }))}
+                              value={editDraft.type ?? session.type}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, type: e.target.value }))}
                               className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
                             >
-                              {["🏃", "⚡", "🔥", "🛣️", "💪", "😴", "🧘"].map((ic) => (
-                                <option key={ic} value={ic}>{ic}</option>
+                              {ACTIVITY_TYPES.map((t) => (
+                                <option key={t} value={t}>{t}</option>
                               ))}
                             </select>
                           </div>
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type</label>
-                          <input
-                            type="text"
-                            value={editDraft.type ?? session.type}
-                            onChange={(e) => setEditDraft((d) => ({ ...d, type: e.target.value }))}
-                            className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
-                            placeholder="f.eks. Terskelløkt"
-                          />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -1876,57 +1919,50 @@ export default function DashboardClient({
                           >
                             <X className="h-3 w-3" /> Avbryt
                           </button>
+                          <button
+                            onClick={() => { cancelEdit(); deleteSession(session.id); }}
+                            className="ml-auto flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3" /> Slett
+                          </button>
                         </div>
                       </div>
                     );
                   }
 
                   return (
-                    <div
+                    <button
                       key={session.id}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors group ${
+                      onClick={() => startEdit(session)}
+                      className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors text-left ${
                         done
-                          ? "bg-emerald-50 border border-emerald-200"
-                          : "bg-[#F8F8F7] border border-transparent hover:border-[#E5E5E2]"
+                          ? "bg-emerald-50 border border-emerald-200 hover:border-emerald-300"
+                          : "bg-[#F8F8F7] border border-transparent hover:border-[#FC5200] hover:bg-orange-50"
                       }`}
                     >
-                      <span className="text-lg leading-none">{session.icon}</span>
+                      <span className="text-lg leading-none shrink-0">{session.icon}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-[#111110]">{session.day}</span>
                           <span className="text-xs text-[#6B6B65] truncate">{session.type}</span>
-                          {session.isCustom && (
-                            <span className="text-[9px] text-[#FC5200] bg-orange-50 border border-orange-200 rounded-full px-1.5 py-0 shrink-0">+</span>
-                          )}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-[#9B9B95]">{session.distance}</span>
-                          {session.pace && <><span className="text-[10px] text-[#9B9B95]">·</span>
-                          <span className="text-[10px] text-[#9B9B95]">{session.pace}</span></>}
-                        </div>
+                        {(session.distance || session.pace) ? (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {session.distance && <span className="text-[10px] text-[#9B9B95]">{session.distance}</span>}
+                            {session.distance && session.pace && <span className="text-[10px] text-[#9B9B95]">·</span>}
+                            {session.pace && <span className="text-[10px] text-[#9B9B95]">{session.pace}</span>}
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-[#C8C8C4] mt-0.5 italic">Klikk for å fylle inn</p>
+                        )}
                       </div>
                       {done && (
                         <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 rounded-full px-2 py-0.5 shrink-0">
                           ✓ Gjort
                         </span>
                       )}
-                      <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-                        <button
-                          onClick={() => startEdit(session)}
-                          className="p-1 rounded-lg hover:bg-[#E5E5E2] text-[#9B9B95] hover:text-[#111110] transition-colors"
-                          title="Rediger"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => deleteSession(session.id)}
-                          className="p-1 rounded-lg hover:bg-red-50 text-[#9B9B95] hover:text-red-500 transition-colors"
-                          title="Slett"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
+                      <Pencil className="h-3 w-3 text-[#C8C8C4] shrink-0" />
+                    </button>
                   );
                 })}
               </div>
@@ -1949,27 +1985,17 @@ export default function DashboardClient({
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Ikon</label>
+                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type aktivitet</label>
                       <select
-                        value={newSession.icon}
-                        onChange={(e) => setNewSession((s) => ({ ...s, icon: e.target.value }))}
+                        value={newSession.type}
+                        onChange={(e) => setNewSession((s) => ({ ...s, type: e.target.value, icon: iconForType(e.target.value) }))}
                         className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
                       >
-                        {["🏃", "⚡", "🔥", "🛣️", "💪", "😴", "🧘"].map((ic) => (
-                          <option key={ic} value={ic}>{ic}</option>
+                        {ACTIVITY_TYPES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
                         ))}
                       </select>
                     </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type *</label>
-                    <input
-                      type="text"
-                      value={newSession.type}
-                      onChange={(e) => setNewSession((s) => ({ ...s, type: e.target.value }))}
-                      className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
-                      placeholder="f.eks. Terskelløkt"
-                    />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1996,8 +2022,7 @@ export default function DashboardClient({
                   <div className="flex gap-2 pt-1">
                     <button
                       onClick={addSession}
-                      disabled={!newSession.type.trim()}
-                      className="flex items-center gap-1 text-xs font-semibold bg-[#FC5200] text-white rounded-lg px-3 py-1.5 hover:bg-[#e04a00] disabled:opacity-40 transition-colors"
+                      className="flex items-center gap-1 text-xs font-semibold bg-[#FC5200] text-white rounded-lg px-3 py-1.5 hover:bg-[#e04a00] transition-colors"
                     >
                       <Plus className="h-3 w-3" /> Legg til
                     </button>
@@ -2018,8 +2043,7 @@ export default function DashboardClient({
                 </button>
               )}
 
-              {/* Ukens fremgangsbar */}
-              <WeeklyProgressBar recentRuns={recentRuns} />
+              {viewingWeek === currentWeekNum && <WeeklyProgressBar recentRuns={recentRuns} />}
             </div>
 
             {/* Siste løp */}
