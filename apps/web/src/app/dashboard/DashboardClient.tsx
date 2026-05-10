@@ -1315,6 +1315,24 @@ export default function DashboardClient({
   const [expandedRun, setExpandedRun] = useState<number | null>(null);
   const [dismissedStatus, setDismissedStatus] = useState(false);
 
+  // ── Coach brief ─────────────────────────────────────────────────────────
+  const [coachBrief, setCoachBrief] = useState<string | null>(null);
+  const [coachBriefLoading, setCoachBriefLoading] = useState(true);
+  const [coachBriefTs, setCoachBriefTs] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/coach-brief")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.brief) {
+          setCoachBrief(d.brief);
+          setCoachBriefTs(d.generatedAt ?? null);
+        }
+      })
+      .catch(() => {/* silent */})
+      .finally(() => setCoachBriefLoading(false));
+  }, []);
+
   // ── Editering av ukens plan ──────────────────────────────────────────────
   type EditableSession = {
     id: string;
@@ -1593,6 +1611,34 @@ export default function DashboardClient({
         {/* ── Tab: Oversikt ── */}
         {activeTab === "oversikt" && (
           <div>
+            {/* Coach brief */}
+            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 rounded-full bg-[#FC5200]" />
+                <span className="text-xs font-semibold text-[#FC5200] uppercase tracking-wide">Coachens situasjonsbilde</span>
+                {coachBriefTs && (
+                  <span className="ml-auto text-[10px] text-[#9B9B95]">
+                    {new Date(coachBriefTs).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
+              </div>
+              {coachBriefLoading ? (
+                <div className="space-y-2">
+                  <div className="h-3 bg-[#F0F0EE] rounded-full w-full animate-pulse" />
+                  <div className="h-3 bg-[#F0F0EE] rounded-full w-5/6 animate-pulse" />
+                  <div className="h-3 bg-[#F0F0EE] rounded-full w-4/6 animate-pulse" />
+                </div>
+              ) : coachBrief ? (
+                <div className="space-y-2">
+                  {coachBrief.split(/\n\n+/).filter(Boolean).map((para, i) => (
+                    <p key={i} className="text-sm text-[#3D3D38] leading-relaxed">{para}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-[#9B9B95]">Ingen statusmelding tilgjengelig.</p>
+              )}
+            </div>
+
             {/* Quick stats */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
