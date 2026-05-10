@@ -1,5 +1,4 @@
-﻿import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import DashboardSidebar from "../DashboardSidebar";
 import { readUserStats } from "@/lib/stats-store";
 import SettingsClient from "./SettingsClient";
@@ -9,9 +8,8 @@ export const metadata = { title: "Innstillinger" };
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
-  const stats = await readUserStats(user.id);
+  const stats = await readUserStats(user?.id ?? "");
 
   return (
     <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex">
@@ -22,9 +20,9 @@ export default async function SettingsPage() {
           <p className="text-sm text-[#6B6B65] mb-8">Konto og app-innstillinger</p>
           <SettingsClient
             user={{
-              email: user.email ?? null,
-              name: (user.user_metadata?.full_name as string | undefined) ?? null,
-              avatar: (user.user_metadata?.avatar_url as string | undefined) ?? null,
+              email: user?.email ?? null,
+              name: (user?.user_metadata?.full_name as string | undefined) ?? null,
+              avatar: (user?.user_metadata?.avatar_url as string | undefined) ?? null,
             }}
             stravaConnected={!!stats.athlete}
             stravaAthlete={stats.athlete}
