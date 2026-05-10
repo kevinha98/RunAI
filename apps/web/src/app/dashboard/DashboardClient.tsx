@@ -4,8 +4,6 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Brain,
-  MessageCircle,
   ChevronRight,
   Play,
   Activity,
@@ -2159,24 +2157,7 @@ export default function DashboardClient({
             {/* Aktivitetskalender */}
             <ActivityCalendar runs={recentRuns} />
 
-            {/* AI Coach link */}
-            <div className="bg-gradient-to-br from-[#FC5200] to-[#E04A00] rounded-2xl p-4 mb-5">
-              <div className="flex items-center gap-3 mb-3">
-                <Brain className="h-5 w-5 text-white" />
-                <h3 className="text-sm font-bold text-white">AI Løpecoach</h3>
-              </div>
-              <p className="text-xs text-orange-100 mb-3">
-                Få personlig tilpassede råd basert på din treningsdata og maratonplan.
-              </p>
-              <Link
-                href="/coach"
-                className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 text-xs font-semibold text-[#FC5200] hover:bg-orange-50 transition-colors w-fit"
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-                Chat med coach
-                <ChevronRight className="h-3 w-3" />
-              </Link>
-            </div>
+
           </div>
         )}
 
