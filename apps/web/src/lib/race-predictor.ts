@@ -80,7 +80,8 @@ export function trainingPaces(vdotScore: number): TrainingPaces {
   const vVo2max = (lo + hi) / 2;
   const secPerKm = (v: number) => (1000 / v) * 60;
   return {
-    easy: [secPerKm(vVo2max * 0.74), secPerKm(vVo2max * 0.59)],
+    // easy: [slow end (59% vVO2max), fast end (74% vVO2max)]
+    easy: [secPerKm(vVo2max * 0.59), secPerKm(vVo2max * 0.74)],
     marathon: secPerKm(vVo2max * 0.80),
     threshold: secPerKm(vVo2max * 0.88),
     interval: secPerKm(vVo2max * 0.98),
@@ -94,6 +95,14 @@ export function predict(input: PredictorInput): PredictorResult {
   let primary: number, method: string, k: number | undefined;
 
   if (!fiveK && !tenK) throw new Error("Minst én løpstid må oppgis.");
+
+  // Sanity bounds: 5K 10:00–60:00, 10K 20:00–120:00
+  if (fiveK !== undefined && (fiveK < 600 || fiveK > 3600))
+    throw new Error(`5K-tid (${formatTime(fiveK)}) virker urimelig — forventet 10:00–60:00.`);
+  if (tenK !== undefined && (tenK < 1200 || tenK > 7200))
+    throw new Error(`10K-tid (${formatTime(tenK)}) virker urimelig — forventet 20:00–2:00:00.`);
+  if (fiveK && tenK && tenK <= fiveK)
+    throw new Error("10K-tid må være større enn 5K-tid.");
 
   if (fiveK && tenK) {
     const r = personalKPredict(fiveK, DIST.FIVE_K, tenK, DIST.TEN_K, targetDist);
@@ -114,9 +123,10 @@ export function predict(input: PredictorInput): PredictorResult {
 
   if (targetDist === DIST.MARATHON) warnings.push("Nøyaktigheten er lavere for maraton — opp til ±10 min avvik er vanlig.");
 
-  const knownTime = fiveK ?? tenK!;
-  const knownDist = fiveK ? DIST.FIVE_K : DIST.TEN_K;
-  const v = vdot(knownTime, knownDist);
+  // Prefer 10K for VDOT (longer race = more reliable VO2max estimate)
+  const vdotTime = tenK ?? fiveK!;
+  const vdotDist = tenK ? DIST.TEN_K : DIST.FIVE_K;
+  const v = vdot(vdotTime, vdotDist);
   return {
     primary: Math.round(primary), optimistic: Math.round(primary * 0.98), conservative: Math.round(primary * 1.03),
     method, k, vdot: Math.round(v * 10) / 10, paces: trainingPaces(v), warnings,
@@ -137,7 +147,18 @@ export function formatPaceMin(secsPerKm: number): string {
 export function parseTime(str: string): number {
   const parts = str.trim().split(":").map(Number);
   if (parts.some(isNaN)) throw new Error(`Ugyldig tid: ${str}`);
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  throw new Error(`Ugyldig format: ${str}`);
+  if (parts.length === 2) {
+    const [m, s] = parts;
+    if (s >= 60) throw new Error(`Sekunder må være 0–59 (fikk ${s})`);
+    if (m < 0) throw new Error("Minutter kan ikke være negative");
+    return m * 60 + s;
+  }
+  if (parts.length === 3) {
+    const [h, m, s] = parts;
+    if (s >= 60) throw new Error(`Sekunder må være 0–59 (fikk ${s})`);
+    if (m >= 60) throw new Error(`Minutter må være 0–59 (fikk ${m})`);
+    if (h < 0) throw new Error("Timer kan ikke være negative");
+    return h * 3600 + m * 60 + s;
+  }
+  throw new Error(`Ugyldig format: bruk mm:ss eller h:mm:ss`);
 }

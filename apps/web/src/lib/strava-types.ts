@@ -431,6 +431,144 @@ export function computeTrainingLoad(runs: StravaActivity[]): TrainingLoad {
   return { atl, ctl, tsb };
 }
 
+// ─── ACWR Types ──────────────────────────────────────────────────────────────
+
+/**
+ * Training load status derived from the Acute:Chronic Workload Ratio.
+ *
+ * - 'Trygg'      : ratio < 0.8  (under-loading / fresh)
+ * - 'Optimal'    : 0.8 <= ratio <= 1.3  (sweet spot)
+ * - 'Høy risiko' : ratio > 1.3  (overloading / injury risk)
+ */
+export type ACWRStatus = 'Trygg' | 'Optimal' | 'Høy risiko';
+
+export interface ACWRResult {
+  /** Acute load: km run in the most recent ISO week */
+  acuteKm: number;
+  /** Chronic load: average km per week over the last 4 ISO weeks */
+  chronicKm: number;
+  /** Acute / Chronic ratio (0 if chronic is 0) */
+  ratio: number;
+  /** Weekly km for each of the last 4 weeks, oldest first */
+  weeklyKm: number[];
+  /** ISO week keys for the last 4 weeks, oldest first (e.g. '2025-W22') */
+  weekKeys: string[];
+  /** Training load status derived from the ratio */
+  status: ACWRStatus;
+}
+
+// ─── ISO Week Helper ─────────────────────────────────────────────────────────
+
+/**
+ * Returns an ISO 8601 week key string for a given date.
+ * Format: 'YYYY-Www'  e.g. '2025-W22'
+ *
+ * Algorithm follows ISO 8601: week 1 is the week containing the first Thursday.
+ * Monday is the first day of the week.
+ *
+ * @param date - Any JS Date
+ * @returns ISO week key string
+ */
+export function getISOWeekKey(date: Date): string {
+  // Work in UTC to avoid DST issues
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  // ISO: Monday=1 … Sunday=7; getUTCDay returns 0=Sun … 6=Sat
+  const day = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+  // Shift to nearest Thursday (ISO weeks belong to the year of their Thursday)
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+// ─── ACWR Computation ────────────────────────────────────────────────────────
+
+/**
+ * Compute the Acute:Chronic Workload Ratio (ACWR) from recent runs.
+ *
+ * Groups runs by ISO 8601 week key and considers only the 4 most recent
+ * ISO weeks relative to today.
+ *
+ * - Acute  = km run in the most recent ISO week (current week)
+ * - Chronic = average km/week across the last 4 ISO weeks (including weeks with 0 km)
+ * - Ratio  = acute / chronic  (returns 0 when chronic === 0)
+ *
+ * Status thresholds (industry standard ACWR):
+ *   ratio < 0.8              → 'Trygg'      (under-training / fresh)
+ *   0.8 <= ratio <= 1.3      → 'Optimal'    (sweet spot)
+ *   ratio > 1.3              → 'Høy risiko' (injury risk zone)
+ *
+ * @param recentRuns - Array of StravaActivity (only running activities)
+ * @returns ACWRResult with ratio, status, per-week km breakdown (oldest → newest)
+ *
+ * @example
+ * const result = computeACWR(storedStats.recentRuns);
+ * // result.status === 'Optimal'
+ * // result.ratio  === 1.05
+ * // result.weekKeys === ['2025-W19', '2025-W20', '2025-W21', '2025-W22']
+ */
+export function computeACWR(recentRuns: StravaActivity[]): ACWRResult {
+  const today = new Date();
+
+  // Build the 4 ISO week keys we care about, oldest first (3 weeks ago → current week)
+  const weekKeys: string[] = [];
+  for (let offset = 3; offset >= 0; offset--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - offset * 7);
+    weekKeys.push(getISOWeekKey(d));
+  }
+
+  // Initialise km buckets for each week
+  const kmPerWeek: Record<string, number> = {};
+  for (const key of weekKeys) {
+    kmPerWeek[key] = 0;
+  }
+
+  // Accumulate km from runs that fall into one of the 4 weeks
+  for (const run of recentRuns) {
+    if (!run.start_date) continue;
+    const runDate = new Date(run.start_date);
+    if (isNaN(runDate.getTime())) continue;
+    const weekKey = getISOWeekKey(runDate);
+    if (weekKey in kmPerWeek) {
+      kmPerWeek[weekKey] += (run.distance ?? 0) / 1000;
+    }
+  }
+
+  // Build weeklyKm array (oldest → newest), rounded to 1 decimal
+  const weeklyKm = weekKeys.map((key) => Math.round(kmPerWeek[key] * 10) / 10);
+
+  // Acute = most recent week (last element)
+  const acuteKm = Math.round(kmPerWeek[weekKeys[3]] * 10) / 10;
+
+  // Chronic = average over all 4 weeks
+  const totalKm4Weeks = weeklyKm.reduce((sum, km) => sum + km, 0);
+  const chronicKm = Math.round((totalKm4Weeks / 4) * 10) / 10;
+
+  // Ratio
+  const rawRatio = chronicKm > 0 ? acuteKm / chronicKm : 0;
+  const ratio = Math.round(rawRatio * 100) / 100;
+
+  // Status
+  let status: ACWRStatus;
+  if (rawRatio > 1.3) {
+    status = 'Høy risiko';
+  } else if (rawRatio >= 0.8) {
+    status = 'Optimal';
+  } else {
+    status = 'Trygg';
+  }
+
+  return {
+    acuteKm,
+    chronicKm,
+    ratio,
+    weeklyKm,
+    weekKeys,
+    status,
+  };
+}
+
 // ─── Computed Metrics ────────────────────────────────────────────────────────
 
 /**

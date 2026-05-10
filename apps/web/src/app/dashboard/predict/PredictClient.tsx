@@ -12,17 +12,18 @@ import {
 } from "@/lib/race-predictor";
 
 function TimeInput({
-  label, hint, value, onChange, testId,
-}: { label: string; hint: string; value: string; onChange: (v: string) => void; testId: string }) {
+  label, hint, value, onChange, onValidChange, testId,
+}: { label: string; hint: string; value: string; onChange: (v: string) => void; onValidChange?: (v: boolean) => void; testId: string }) {
   const [error, setError] = useState<string | null>(null);
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const v = e.target.value;
     onChange(v);
-    if (!v) { setError(null); return; }
+    if (!v) { setError(null); onValidChange?.(true); return; }
     try {
       const s = parseTime(v);
-      setError(s <= 0 ? "Tid må være større enn 0" : null);
-    } catch { setError("Format: mm:ss (f.eks. 22:14)"); }
+      if (s <= 0) { setError("Tid må være større enn 0"); onValidChange?.(false); }
+      else { setError(null); onValidChange?.(true); }
+    } catch (err) { setError(err instanceof Error ? err.message : "Ugyldig format"); onValidChange?.(false); }
   }
   return (
     <div className="flex flex-col gap-1">
@@ -56,12 +57,14 @@ function RangeBar({ optimistic, primary, conservative }: { optimistic: number; p
 export default function PredictClient() {
   const [fiveKStr, setFiveKStr] = useState("");
   const [tenKStr, setTenKStr] = useState("");
+  const [fiveKValid, setFiveKValid] = useState(true);
+  const [tenKValid, setTenKValid] = useState(true);
   const [results, setResults] = useState<{ halfMarathon: PredictorResult; tenKPred?: PredictorResult; marathon: PredictorResult } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPaces, setShowPaces] = useState(false);
   const [showScience, setShowScience] = useState(false);
 
-  const canSubmit = fiveKStr.trim() !== "" || tenKStr.trim() !== "";
+  const canSubmit = (fiveKStr.trim() !== "" || tenKStr.trim() !== "") && fiveKValid && tenKValid;
 
   const handlePredict = useCallback(() => {
     setError(null); setResults(null);
@@ -82,10 +85,10 @@ export default function PredictClient() {
       {/* Input */}
       <div className="bg-white border border-[#E5E5E2] rounded-xl p-6">
         <h2 className="text-base font-semibold text-[#111110] mb-1">Dine løpsresultater</h2>
-        <p className="text-xs text-[#9B9B95] mb-5">Fyll inn én eller begge for best mulig prediksjon</p>
+        <p className="text-xs text-[#9B9B95] mb-5">Fyll inn én eller begge. Format: <code className="bg-[#F5F5F3] px-1 rounded">mm:ss</code> eller <code className="bg-[#F5F5F3] px-1 rounded">h:mm:ss</code></p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <TimeInput label="5K personlig beste" hint="F.eks. 22:14" value={fiveKStr} onChange={setFiveKStr} testId="input-5k" />
-          <TimeInput label="10K personlig beste" hint="F.eks. 45:30" value={tenKStr} onChange={setTenKStr} testId="input-10k" />
+          <TimeInput label="5K personlig beste" hint="F.eks. 22:14 (mm:ss)" value={fiveKStr} onChange={setFiveKStr} onValidChange={setFiveKValid} testId="input-5k" />
+          <TimeInput label="10K personlig beste" hint="F.eks. 45:30 (mm:ss)" value={tenKStr} onChange={setTenKStr} onValidChange={setTenKValid} testId="input-10k" />
         </div>
         {tenKStr.trim() && fiveKStr.trim() && (
           <p className="mt-4 text-xs text-green-600">✓ Begge tider gitt — bruker personlig k-faktor for høyest nøyaktighet</p>
