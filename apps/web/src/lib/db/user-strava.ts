@@ -42,6 +42,21 @@ export async function getUserStrava(userId: string): Promise<UserStravaRow | nul
   return data as UserStravaRow;
 }
 
+// ─── Look up any connected user (single-user app fallback) ───────────────────
+
+export async function getAnyStravaUserId(): Promise<string | null> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("user_strava")
+    .select("user_id")
+    .not("access_token", "is", null)
+    .limit(1)
+    .single();
+
+  if (error || !data) return null;
+  return (data as { user_id: string }).user_id;
+}
+
 // ─── Look up user_id by Strava athlete ID (for webhook) ──────────────────────
 
 export async function getUserIdByStravaAthleteId(

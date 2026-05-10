@@ -12,9 +12,10 @@ import { revalidatePath } from "next/cache";
 import { getAthleteForUser, getAthleteStatsForUser, getAllActivitiesForUser } from "@/lib/strava";
 import { computeMetrics, writeUserStats, type StoredStats } from "@/lib/stats-store";
 import { createClient } from "@/lib/supabase/server";
+import { getAnyStravaUserId } from "@/lib/db/user-strava";
 
 export async function POST(req: NextRequest) {
-  // Allow internal calls (from callback) via header, else use session
+  // Allow internal calls (from callback) via header, else use session or fallback to first user
   const headerUserId = req.headers.get("x-user-id");
   let userId: string;
 
@@ -23,10 +24,16 @@ export async function POST(req: NextRequest) {
   } else {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (user) {
+      userId = user.id;
+    } else {
+      // No active session — fall back to the first Strava-connected user (single-user app)
+      const fallbackId = await getAnyStravaUserId();
+      if (!fallbackId) {
+        return NextResponse.json({ error: "No Strava connection found" }, { status: 401 });
+      }
+      userId = fallbackId;
     }
-    userId = user.id;
   }
 
   try {
