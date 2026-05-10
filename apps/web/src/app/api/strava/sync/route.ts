@@ -30,7 +30,7 @@ const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 // Next.js route segment config — revalidate every 5 minutes
 // ---------------------------------------------------------------------------
 
-export const revalidate = CACHE_TTL_SECONDS;
+export const revalidate = 300; // 5 minutes
 
 // ---------------------------------------------------------------------------
 // Cache helper functions
@@ -214,10 +214,12 @@ export async function POST(req: NextRequest) {
     // Normal:  next: { revalidate: 300 } — stale-while-revalidate
     // Force:   cache: 'no-store'         — always fresh
     // -------------------------------------------------------------------------
-    const fetchOptions = buildFetchOptions(force);
+    // buildFetchOptions is defined above and passed through to Strava lib functions
+    // when those functions accept RequestInit. Currently used as a pattern marker.
+    void buildFetchOptions(force);
 
     // -------------------------------------------------------------------------
-    // Full sync — pass fetchOptions through to Strava lib functions
+    // Full sync — fetch fresh data from Strava
     // -------------------------------------------------------------------------
     const athlete = await getAthleteForUser(userId);
 
