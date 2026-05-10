@@ -969,11 +969,12 @@ interface PaceProgressResult {
 
 function computePaceProgress(runs: StravaActivity[]): PaceProgressResult | null {
   // Only use threshold sessions: name must contain 'terskel' (case-insensitive)
+  // Extract pace from the activity name "@m:ss" notation (most reliable — user-stated pace, no GPS noise)
+  // Fall back to computed pace (moving_time / distance) if no "@" annotation is present.
+  const AT_PACE_RE = /@(\d{1,2}):(\d{2})/;
+
   const thresholdRuns = runs.filter(
-    (r) =>
-      r.distance > 0 &&
-      r.moving_time > 0 &&
-      (r.name ?? "").toLowerCase().includes("terskel")
+    (r) => (r.name ?? "").toLowerCase().includes("terskel")
   );
   if (thresholdRuns.length === 0) return null;
 
@@ -983,11 +984,21 @@ function computePaceProgress(runs: StravaActivity[]): PaceProgressResult | null 
       new Date(a.start_date_local).getTime()
   );
 
-  // Average pace of the 5 most recent threshold sessions
-  const recent5 = sorted.slice(0, 5);
-  const avgSec =
-    recent5.reduce((sum, r) => sum + r.moving_time / (r.distance / 1000), 0) /
-    recent5.length;
+  // Parse pace from each run: prefer "@m:ss" in name, fall back to computed only if distance/time valid
+  const paces: number[] = [];
+  for (const r of sorted.slice(0, 5)) {
+    const match = AT_PACE_RE.exec(r.name ?? "");
+    if (match) {
+      const sec = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+      if (sec > 0) { paces.push(sec); continue; }
+    }
+    if (r.distance > 0 && r.moving_time > 0) {
+      paces.push(r.moving_time / (r.distance / 1000));
+    }
+  }
+  if (paces.length === 0) return null;
+
+  const avgSec = paces.reduce((s, p) => s + p, 0) / paces.length;
 
   const diffSec = avgSec - TARGET_PACE_SEC_PER_KM;
   const progressPct =
@@ -1037,7 +1048,7 @@ function computePaceProgress(runs: StravaActivity[]): PaceProgressResult | null 
     badgeBgClass,
     badgeTextClass,
     label,
-    sessionCount: recent5.length,
+    sessionCount: paces.length,
   };
 }
 
@@ -1052,19 +1063,33 @@ interface HMMonthPoint {
 
 function buildHMMonthPoints(activities: StravaActivity[]): HMMonthPoint[] {
   // Only threshold sessions: name must contain 'terskel' (case-insensitive)
+  // Prefer "@m:ss" pace from activity name over computed pace to avoid GPS/pause noise.
+  const AT_PACE_RE = /@(\d{1,2}):(\d{2})/;
+
   const qualifying = activities.filter(a => {
     if (a.type !== "Run" && a.sport_type !== "Run") return false;
-    if (!(a.name ?? "").toLowerCase().includes("terskel")) return false;
-    if (a.distance < 3000 || a.moving_time <= 0) return false;
-    const secPerKm = a.moving_time / (a.distance / 1000);
-    return secPerKm >= 180 && secPerKm <= 480; // 3:00–8:00 min/km
+    return (a.name ?? "").toLowerCase().includes("terskel");
   });
   if (qualifying.length === 0) return [];
 
   const byMonth = new Map<string, number>();
   for (const run of qualifying) {
+    // Determine effective pace (sec/km): prefer "@m:ss" from name
+    let secPerKm: number;
+    const match = AT_PACE_RE.exec(run.name ?? "");
+    if (match) {
+      secPerKm = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+    } else if (run.distance > 0 && run.moving_time > 0) {
+      secPerKm = run.moving_time / (run.distance / 1000);
+    } else {
+      continue;
+    }
+    if (secPerKm < 180 || secPerKm > 480) continue; // sanity: 3:00–8:00 min/km
+    // Use a representative 5 km effort time (as if run at this pace) for Cameron prediction
+    const refDist = run.distance > 0 ? run.distance : 5000;
+    const refTime = secPerKm * (refDist / 1000);
+    const hmEst = cameronPredict(refTime, refDist, DIST.HALF_MARATHON);
     const month = run.start_date_local.slice(0, 7);
-    const hmEst = cameronPredict(run.moving_time, run.distance, DIST.HALF_MARATHON);
     const prev = byMonth.get(month);
     if (prev === undefined || hmEst < prev) byMonth.set(month, hmEst);
   }
