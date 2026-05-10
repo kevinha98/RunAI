@@ -119,7 +119,19 @@ export async function GET() {
     if (!userId) return NextResponse.json({ checkins: [] });
 
     const checkins = await getUserCheckins(userId, 10);
-    return NextResponse.json({ checkins });
+
+    // Map camelCase WeeklyCheckin → snake_case HistoryEntry (matches page interface)
+    const mapped = checkins.map((c) => ({
+      id: c.id,
+      week_number: c.weekNumber,
+      week_date: c.weekDate,
+      user_report: c.userReport,
+      llm_analysis: c.llmAnalysis,
+      adjustments: c.adjustments ?? [],
+      created_at: c.createdAt,
+    }));
+
+    return NextResponse.json({ checkins: mapped });
   } catch (err) {
     console.error("[api/checkin] GET error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
