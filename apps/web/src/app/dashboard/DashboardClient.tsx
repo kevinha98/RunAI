@@ -1873,7 +1873,7 @@ export default function DashboardClient({
                           ✓ Gjort
                         </span>
                       )}
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                         <button
                           onClick={() => startEdit(session)}
                           className="p-1 rounded-lg hover:bg-[#E5E5E2] text-[#9B9B95] hover:text-[#111110] transition-colors"
