@@ -1742,7 +1742,7 @@ export default function DashboardClient({
             <HalfMarathonTrendCard
               activities={recentActivities}
               fiveKmPrSec={personalBests.fiveKm > 0 ? personalBests.fiveKm : undefined}
-              thresholdPaceSec={paceProgress?.currentPaceSec}
+              thresholdPaceSec={paceProgress != null ? paceProgress.currentPaceSec : undefined}
             />
 
             {/* PR-kort */}
