@@ -985,21 +985,20 @@ function computePaceProgress(runs: StravaActivity[], targetPaceSec: number): Pac
       new Date(a.start_date_local).getTime()
   );
 
-  // Parse pace from each run: prefer "@m:ss" in name, fall back to computed only if distance/time valid
-  const paces: number[] = [];
-  for (const r of sorted.slice(0, 5)) {
-    const match = AT_PACE_RE.exec(r.name ?? "");
-    if (match) {
-      const sec = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
-      if (sec > 0) { paces.push(sec); continue; }
-    }
-    if (r.distance > 0 && r.moving_time > 0) {
-      paces.push(r.moving_time / (r.distance / 1000));
-    }
+  // Use only the single most recent threshold run
+  const latest = sorted[0];
+  let latestPaceSec: number;
+  const match = AT_PACE_RE.exec(latest.name ?? "");
+  if (match) {
+    latestPaceSec = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  } else if (latest.distance > 0 && latest.moving_time > 0) {
+    latestPaceSec = latest.moving_time / (latest.distance / 1000);
+  } else {
+    return null;
   }
-  if (paces.length === 0) return null;
+  if (latestPaceSec <= 0) return null;
 
-  const avgSec = paces.reduce((s, p) => s + p, 0) / paces.length;
+  const avgSec = latestPaceSec;
 
   const diffSec = avgSec - targetPaceSec;
   const progressPct =
@@ -1049,7 +1048,7 @@ function computePaceProgress(runs: StravaActivity[], targetPaceSec: number): Pac
     badgeBgClass,
     badgeTextClass,
     label,
-    sessionCount: paces.length,
+    sessionCount: 1,
   };
 }
 
@@ -1117,21 +1116,53 @@ function hmRegression(pts: HMMonthPoint[]): { slope: number; intercept: number }
   return { slope, intercept };
 }
 
-function HalfMarathonTrendCard({ activities }: { activities: StravaActivity[] }) {
+function HalfMarathonTrendCard({
+  activities,
+  fiveKmPrSec,
+  thresholdPaceSec,
+}: {
+  activities: StravaActivity[];
+  fiveKmPrSec?: number;      // 5K PR moving_time in seconds
+  thresholdPaceSec?: number; // most recent threshold pace sec/km
+}) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const points = useMemo(() => buildHMMonthPoints(activities), [activities]);
+  const realPoints = useMemo(() => buildHMMonthPoints(activities), [activities]);
+
+  // ── Syntetiske fallback-punkt ─────────────────────────────────────────────
+  // Brukes når vi har < 2 måneder med ekte terskeldata.
+  // Ankerpunkt 0: basert på 5K PR → Cameron HM-estimat (mai 2026)
+  // Ankerpunkt 1: basert på nåværende terskelfart som en 5 km @ pace (jun 2026)
+  // Disse gir en startlinje trendlinja kan strekkes fra.
+  const syntheticPoints = useMemo((): HMMonthPoint[] => {
+    const pts: HMMonthPoint[] = [];
+    if (fiveKmPrSec && fiveKmPrSec > 0) {
+      const hmEst = cameronPredict(fiveKmPrSec, 5000, DIST.HALF_MARATHON);
+      pts.push({ monthKey: "2026-05", label: "5K PR", hmSec: hmEst, monthIndex: 0 });
+    }
+    if (thresholdPaceSec && thresholdPaceSec > 0) {
+      const notionalTime = thresholdPaceSec * 5;
+      const hmEst = cameronPredict(notionalTime, 5000, DIST.HALF_MARATHON);
+      pts.push({ monthKey: "2026-06", label: "Terskel", hmSec: hmEst, monthIndex: 1 });
+    }
+    return pts;
+  }, [fiveKmPrSec, thresholdPaceSec]);
+
+  const usingSynthetic = realPoints.length < 2;
+  const points = usingSynthetic && syntheticPoints.length >= 2 ? syntheticPoints : realPoints;
+  // ─────────────────────────────────────────────────────────────────────────
+
   const regression = useMemo(() => hmRegression(points), [points]);
 
   const raceMonthIndex = useMemo(() => {
     if (!points.length) return null;
     const [fy, fm] = points[0].monthKey.split("-").map(Number);
-    return (2027 - fy) * 12 + (4 - fm); // months from first data point to April 2027
+    return (2027 - fy) * 12 + (4 - fm);
   }, [points]);
 
   const raceDayProjection = useMemo(() => {
     if (!regression || raceMonthIndex === null) return null;
     const raw = regression.intercept + regression.slope * raceMonthIndex;
-    return Math.max(3600, Math.min(14400, raw)); // clamp 1h–4h
+    return Math.max(3600, Math.min(14400, raw));
   }, [regression, raceMonthIndex]);
 
   const currentBest = useMemo(
@@ -1147,9 +1178,7 @@ function HalfMarathonTrendCard({ activities }: { activities: StravaActivity[] })
           <h3 className="text-sm font-bold text-[#111110]">Halvmaraton-estimat</h3>
         </div>
         <p className="text-xs text-[#9B9B95] italic">
-          {points.length === 0
-            ? "Ikke nok løpedata. Logg løp for å se halvmaraton-estimat."
-            : "Trenger data fra minst 2 måneder for trendlinje."}
+          Legg inn 5K personrekord eller logg terskeløkter for å se estimat.
         </p>
       </div>
     );
@@ -1260,6 +1289,8 @@ function HalfMarathonTrendCard({ activities }: { activities: StravaActivity[] })
                 style={{ cursor: "pointer" }} />
               <circle cx={cx} cy={cy} r={isH ? 4 : 2.5}
                 fill="white" stroke={STRAVA_ORANGE} strokeWidth={isH ? 2 : 1.5}
+                strokeDasharray={usingSynthetic ? "2 2" : undefined}
+                opacity={usingSynthetic ? 0.6 : 1}
                 style={{ pointerEvents: "none" }} />
               {(i === 0 || i === points.length - 1) && (
                 <text x={cx} y={H + 13} textAnchor="middle" fontSize={7} fill="#9B9B95"
@@ -1289,7 +1320,9 @@ function HalfMarathonTrendCard({ activities }: { activities: StravaActivity[] })
         )}
       </svg>
       <p className="text-[9px] text-[#9B9B95] mt-0.5 leading-tight">
-        Beste Cameron-estimat per måned · Stiplet linje = trend mot Bergen City Halvmaraton apr 2027
+        {usingSynthetic
+          ? "Estimert fra 5K PR og terskelfart · Oppdateres med faktiske terskeløkter"
+          : "Beste Cameron-estimat per måned · Stiplet linje = trend mot Bergen City Halvmaraton apr 2027"}
       </p>
     </div>
   );
@@ -1678,7 +1711,11 @@ export default function DashboardClient({
             )}
 
             {/* Halvmaraton-estimat trend */}
-            <HalfMarathonTrendCard activities={recentActivities} />
+            <HalfMarathonTrendCard
+              activities={recentActivities}
+              fiveKmPrSec={personalBests.fiveKm > 0 ? personalBests.fiveKm : undefined}
+              thresholdPaceSec={paceProgress?.currentPaceSec}
+            />
 
             {/* PR-kort */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
