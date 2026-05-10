@@ -1301,8 +1301,8 @@ function HalfMarathonTrendCard({
       </svg>
       <p className="text-[9px] text-[#9B9B95] mt-0.5 leading-tight">
         {hasReal
-          ? "?? Faktiske terskeloekter · ?? Treningsplan-prediksjon mot Bergen City Halvmaraton apr 2027"
-          : "Treningsplan-prediksjon: terskelfart 5:20→4:35/km · Oppdateres med faktiske terskeloekter"}
+          ? "🟠 Faktiske terskeløkter · 🟢 Treningsplan-prediksjon mot Bergen City Halvmaraton apr 2027"
+          : "Treningsplan-prediksjon: terskelfart 5:20→4:35/km · Oppdateres med faktiske terskeløkter"}
       </p>
     </div>
   );
