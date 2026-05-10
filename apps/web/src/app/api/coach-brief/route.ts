@@ -72,12 +72,12 @@ export async function GET() {
     // Latest checkin
     const latestCheckin = checkins[0] ?? null;
     const checkinText = latestCheckin
-      ? `SISTE UKERAPPORT (${latestCheckin.week_label ?? "ukjent uke"}, innlevert ${new Date(latestCheckin.created_at).toLocaleDateString("nb-NO")}):\n${latestCheckin.llm_response ?? latestCheckin.summary ?? "Ingen rapport."}`
+      ? `SISTE UKERAPPORT (${latestCheckin.weekNumber ?? "uke "}, innlevert ${new Date(latestCheckin.createdAt).toLocaleDateString("nb-NO")}):\n${latestCheckin.llmAnalysis ?? latestCheckin.userReport ?? "Ingen rapport."}`
       : "Ingen ukerapport tilgjengelig.";
 
     // Next week plan
     const nextWeekText = nextWeekData
-      ? `Neste uke (uke ${currentWeek + 1}): ${nextWeekData.focus} — mål ${nextWeekData.totalKm} km (${nextWeekData.sessions.map((s) => `${s.type} ${s.km ? s.km + " km" : s.duration ?? ""}`).join(", ")})`
+      ? `Neste uke (uke ${currentWeek + 1}): ${nextWeekData.phase} — mål ${nextWeekData.totalKm} km (${nextWeekData.sessions.map((s) => `${s.type} ${s.distance ?? ""}`).join(", ")})`
       : "Siste planuke nådd.";
 
     const today = new Date().toLocaleDateString("nb-NO", {
@@ -97,7 +97,7 @@ REGLER:
 - Ikke gjenta "Bergen City Marathon" i hver setning`;
 
     const userMessage = `DAGENS DATO: ${today}
-GJELDENDE PLANUKE: ${currentWeek} — ${weekData?.focus ?? "ukjent"}
+GJELDENDE PLANUKE: ${currentWeek} — ${weekData?.phase ?? "ukjent"}
 
 STRAVA SISTE 7 DAGER (${recentRuns.length} løpeturer, totalt ${totalKmWeek.toFixed(1)} km):
 ${activityLines}
