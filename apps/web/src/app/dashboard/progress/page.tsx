@@ -433,9 +433,11 @@ export default async function ProgressPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    // No auth required — continue without user
+  }
 
-  const stats = await readUserStats(user.id);
+  const stats = await readUserStats(user?.id ?? "");
 
   const allActivities = stats?.recentActivities ?? [];
   const runs = allActivities.filter(

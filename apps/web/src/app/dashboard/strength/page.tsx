@@ -184,9 +184,7 @@ export default async function StrengthPage() {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
-
-  const stats = await readUserStats(user.id);
+  const stats = await readUserStats(user?.id ?? "");
 
 
 
