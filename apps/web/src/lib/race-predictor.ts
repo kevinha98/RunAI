@@ -140,7 +140,8 @@ export function formatTime(totalSeconds: number): string {
 }
 
 export function formatPaceMin(secsPerKm: number): string {
-  const m = Math.floor(secsPerKm / 60), s = Math.round(secsPerKm % 60);
+  let m = Math.floor(secsPerKm / 60), s = Math.round(secsPerKm % 60);
+  if (s === 60) { m += 1; s = 0; }
   return `${m}:${String(s).padStart(2, "0")} /km`;
 }
 

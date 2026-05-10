@@ -764,8 +764,9 @@ export function computePersonalBests(runs: StravaActivity[]): PersonalBests {
 /** Convert seconds-per-km to "M:SS" string, e.g. 321 → "5:21" */
 export function formatPace(secPerKm: number): string {
   if (!secPerKm || secPerKm <= 0) return "—";
-  const mins = Math.floor(secPerKm / 60);
-  const secs = Math.round(secPerKm % 60);
+  let mins = Math.floor(secPerKm / 60);
+  let secs = Math.round(secPerKm % 60);
+  if (secs === 60) { mins += 1; secs = 0; }
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
