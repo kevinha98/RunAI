@@ -124,7 +124,8 @@ export function computePaceZoneDistribution(
 }
 
 /**
- * Formats a pace zone distribution as a human-readable percentage summary.
+ * Formats a pace zone distribution as a human-readable percentage summary
+ * suitable for UI widgets (e.g. ukerapport-widget).
  * Only zones with at least one run are included.
  * Zones are listed in order from Lett → VO2max.
  *
@@ -148,8 +149,7 @@ export function formatZoneSummary(distribution: ZoneDistribution[]): string {
  * intended for use in AI coach system prompts to convey training balance
  * without sending raw activity data.
  *
- * Only zones with at least one run are included, listed in order Lett → VO2max
- * (order is preserved from computePaceZoneDistribution).
+ * Only zones with at least one run are included, listed in order Lett → VO2max.
  * Zone labels are lowercase for natural Norwegian sentence flow.
  *
  * @param distribution - Output from computePaceZoneDistribution()
@@ -169,6 +169,31 @@ export function summarizePaceZones(distribution: ZoneDistribution[]): string {
     .map((entry) => `${entry.percentage}% ${entry.zone.label.toLowerCase()}`);
 
   return parts.length > 0 ? parts.join(', ') : 'ingen løpsdata tilgjengelig';
+}
+
+/**
+ * Convenience helper: computes pace zone distribution from runs and returns
+ * a human-readable summary string in one call.
+ *
+ * Uses '·'-separated format with Title Case labels (suitable for UI widgets
+ * and ukerapport display). For AI coach prompts use summarizePaceZones() instead.
+ *
+ * @param runs            - Array of StravaActivity (recent runs)
+ * @param avgPaceSecPerKm - User's overall average pace in sec/km
+ * @param limit           - How many recent runs to include (default 10)
+ * @returns E.g. '60% Lett · 25% Moderat · 15% Terskel'
+ *
+ * @example
+ * computeAndFormatZoneSummary(stravaData.recentRuns, stravaData.computed.avgPaceSecPerKm);
+ * // => '60% Lett · 25% Moderat · 15% Terskel'
+ */
+export function computeAndFormatZoneSummary(
+  runs: StravaActivity[],
+  avgPaceSecPerKm: number,
+  limit = 10
+): string {
+  const distribution = computePaceZoneDistribution(runs, avgPaceSecPerKm, limit);
+  return formatZoneSummary(distribution);
 }
 
 // ─── HR Zone Types ───────────────────────────────────────────────────────────
