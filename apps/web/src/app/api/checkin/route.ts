@@ -4,6 +4,7 @@ import { MODELS } from "@/lib/llm";
 import { readUserStats } from "@/lib/stats-store";
 import { formatPace } from "@/lib/strava-types";
 import { createClient } from "@/lib/supabase/server";
+import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import { saveCheckin, getUserCheckins } from "@/lib/db/checkins";
 import type { PlanAdjustment } from "@/lib/db/checkins";
 import { WEEKS, getCurrentWeek, PLAN_START, TOTAL_WEEKS } from "@/lib/plan-data";
@@ -20,6 +21,15 @@ function getClient(): Anthropic {
     apiKey,
     defaultHeaders: { "x-api-key": apiKey },
   });
+}
+
+// ─── Auth helper ─────────────────────────────────────────────────────────────
+
+async function resolveUserId(): Promise<string | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) return user.id;
+  return getAnyStravaUserId();
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -105,11 +115,10 @@ function parseAdjustments(text: string): PlanAdjustment[] {
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = await resolveUserId();
+    if (!userId) return NextResponse.json({ checkins: [] });
 
-    const checkins = await getUserCheckins(user.id, 10);
+    const checkins = await getUserCheckins(userId, 10);
     return NextResponse.json({ checkins });
   } catch (err) {
     console.error("[api/checkin] GET error:", err);
@@ -121,9 +130,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = await resolveUserId();
+    if (!userId) return NextResponse.json({ error: "Ingen Strava-kobling funnet" }, { status: 401 });
 
     const body = await req.json();
     const userReport: string = (body.report ?? "").trim();
@@ -136,17 +144,27 @@ export async function POST(req: NextRequest) {
     }
 
     // Load user's Strava data and training plan context
-    const stats = await readUserStats(user.id);
+    const stats = await readUserStats(userId);
     const currentWeek = getCurrentWeek();
     const activitySummary = buildActivitySummary(stats);
     const planWeekText = buildPlanWeekText(currentWeek);
     const weekDate = planWeekMonday(currentWeek);
 
+    // Date context for LLM
+    const today = new Date();
+    const todayISO = today.toISOString().slice(0, 10);
+    const todayFormatted = today.toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const weekSundayISO = new Date(new Date(weekDate).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
     const systemPrompt = `Du er en erfaren maratontrener som hjelper en løper mot Bergen City Marathon 24. april 2027.
+
+DAGENS DATO: ${todayFormatted} (${todayISO})
+GJELDENDE PLANUKE: Uke ${currentWeek}/${TOTAL_WEEKS}
+UKEPERIODE: ${weekDate} (mandag) til ${weekSundayISO} (søndag)
 
 Du mottar:
 1. En ukerapport fra løperen (subjektiv opplevelse, form, eventuelle problemer)
-2. Strava-data for uken (faktisk gjennomføring)
+2. Strava-data for uken (faktisk gjennomføring med datoer)
 3. Treningsplanen for gjeldende uke
 
 Din oppgave er å:
@@ -154,8 +172,9 @@ Din oppgave er å:
 2. Gi konkrete, handlingsrettede råd
 3. Foreslå justeringer til kommende ukes plan hvis nødvendig
 4. Være ærlig og direkte — si klart fra om løperen trenger mer restitusjon eller bør øke belastningen
+5. Relatere fremgang til tid igjen til løpet (Bergen City Marathon 24. april 2027)
 
-Svar på norsk. Bruk strukturert markdown (overskrifter, punktlister).
+Svar på norsk. Bruk strukturert markdown (overskrifter, punktlister). Inkluder alltid dato-referanser i analysen.
 
 Dersom du foreslår justeringer til treningsplanen, inkluder dem som en JSON-array mellom <adjustments>-tagger:
 <adjustments>
@@ -173,7 +192,8 @@ Dersom du foreslår justeringer til treningsplanen, inkluder dem som en JSON-arr
 
 Hvis ingen justeringer er nødvendige, skriv <adjustments>[]</adjustments>.`;
 
-    const userMessage = `## Ukerapport — Uke ${currentWeek}/${TOTAL_WEEKS}
+    const userMessage = `## Ukerapport — Uke ${currentWeek}/${TOTAL_WEEKS} (${weekDate} til ${weekSundayISO})
+**Rapport sendt:** ${todayFormatted}
 
 ### Min rapport
 ${userReport}
@@ -181,7 +201,7 @@ ${userReport}
 ### Strava-aktivitet siste 7 dager
 ${activitySummary}
 
-### Treningsplan for denne uken
+### Treningsplan for denne uken (${weekDate}–${weekSundayISO})
 ${planWeekText}
 
 Analyser uken min og gi meg tilbakemelding. Foreslå eventuelle justeringer til neste uke.`;
@@ -208,7 +228,7 @@ Analyser uken min og gi meg tilbakemelding. Foreslå eventuelle justeringer til 
 
     // Persist to DB
     const saved = await saveCheckin({
-      userId: user.id,
+      userId,
       weekNumber: currentWeek,
       weekDate,
       userReport,
