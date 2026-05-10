@@ -588,31 +588,27 @@ function ActivityCalendar({ runs }: { runs: StravaActivity[] }) {
         <h3 className="text-sm font-bold text-[#111110]">Aktivitetskalender</h3>
         <span className="text-xs text-[#6B6B65]">Siste 8 uker</span>
       </div>
-      <div className="flex gap-1">
-        {/* Dag-etiketter */}
-        <div className="flex flex-col gap-[3px] mr-1">
+      <div className="flex gap-1 w-full">
+        {/* Dag-etiketter (rad) */}
+        <div className="flex flex-col justify-around pt-4 pr-1 shrink-0">
           {dayLabels.map((label, i) => (
-            <span
-              key={i}
-              className="text-[9px] text-[#9B9B95] leading-none flex items-center"
-              style={{ height: "12px" }}
-            >
+            <span key={i} className="text-[9px] text-[#9B9B95] leading-none">
               {label}
             </span>
           ))}
         </div>
-        {/* Uker som kolonner */}
-        {weeks.map((week, wi) => {
-          const firstDay = week[0];
-          const monthLabel = wi === 0 || firstDay.getDate() <= 7
-            ? firstDay.toLocaleDateString("nb-NO", { month: "short" })
-            : "";
-          return (
-            <div key={wi} className="flex flex-col">
-              <span className="text-[9px] text-[#9B9B95] leading-none mb-1 h-3">
-                {monthLabel}
-              </span>
-              <div className="flex flex-col gap-[3px]">
+        {/* Uker som kolonner — fyller full breidd */}
+        <div className="flex gap-1 flex-1 min-w-0">
+          {weeks.map((week, wi) => {
+            const firstDay = week[0];
+            const monthLabel = wi === 0 || firstDay.getDate() <= 7
+              ? firstDay.toLocaleDateString("nb-NO", { month: "short" })
+              : "";
+            return (
+              <div key={wi} className="flex flex-col flex-1 min-w-0 gap-1">
+                <span className="text-[9px] text-[#9B9B95] leading-none h-3 truncate">
+                  {monthLabel}
+                </span>
                 {week.map((day, di) => {
                   const dateStr = day.toLocaleDateString("sv-SE");
                   const km = heatmap.get(dateStr) ?? 0;
@@ -623,19 +619,18 @@ function ActivityCalendar({ runs }: { runs: StravaActivity[] }) {
                     <div
                       key={di}
                       title={isFuture ? dateStr : `${dateStr}: ${km > 0 ? km.toFixed(1) + " km" : "Ingen økt"}`}
-                      className={`rounded-sm cursor-default transition-opacity hover:opacity-75 ${
+                      className={`w-full aspect-square rounded-sm cursor-default transition-opacity hover:opacity-75 ${
                         isFuture ? "bg-[#F5F5F3] border border-[#EBEBEA]" : colorClass
                       } ${isToday ? "ring-1 ring-[#FC5200] ring-offset-0" : ""}`}
-                      style={{ width: "12px", height: "12px" }}
                     />
                   );
                 })}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-      <div className="flex items-center gap-3 mt-3">
+      <div className="flex items-center gap-2 mt-3">
         <span className="text-[10px] text-[#9B9B95]">Mindre</span>
         <div className="flex gap-1">
           <div className="w-3 h-3 rounded-sm bg-white border border-gray-200" title="0 km" />
