@@ -200,7 +200,7 @@ async function stravaFetch<T>(path: string, params?: Record<string, string | num
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
     // Revalidate every 5 minutes in Next.js cache
-    next: { revalidate: 300 },
+    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -314,7 +314,7 @@ async function stravaFetchWithToken<T>(
   }
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
-    next: { revalidate: 300 },
+    cache: "no-store",
   });
   if (!res.ok) {
     const text = await res.text();

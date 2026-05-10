@@ -67,8 +67,11 @@ export function computeMetrics(
   stravaStats: StravaStats | null
 ): ComputedMetrics {
   const now = new Date();
+  // Week starts Monday (consistent with the rest of the dashboard)
   const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - now.getDay()); // Sunday
+  const dayOfWeek = weekStart.getDay(); // 0 = Sunday
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  weekStart.setDate(weekStart.getDate() - daysToMonday);
   weekStart.setHours(0, 0, 0, 0);
 
   const thirtyDaysAgo = new Date(now);

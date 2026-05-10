@@ -61,9 +61,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const runs = activities.filter(
-      (a) => a.type === "Run" || a.sport_type === "Run"
-    );
+    const runs = activities
+      .filter((a) => a.type === "Run" || a.sport_type === "Run")
+      .sort((a, b) => new Date(b.start_date_local).getTime() - new Date(a.start_date_local).getTime());
 
     const computed = computeMetrics(runs, stravaStats);
 
