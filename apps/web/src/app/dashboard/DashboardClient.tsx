@@ -18,6 +18,10 @@ import {
   BarChart2,
   Trophy,
   X,
+  Pencil,
+  Trash2,
+  Plus,
+  Check,
 } from "lucide-react";
 import type { StoredStats, StravaActivity } from "@/lib/strava-types";
 import { formatPace, computePaceZoneDistribution, computePersonalBests } from "@/lib/strava-types";
@@ -1279,6 +1283,85 @@ export default function DashboardClient({
   const [expandedRun, setExpandedRun] = useState<number | null>(null);
   const [dismissedStatus, setDismissedStatus] = useState(false);
 
+  // ── Editering av ukens plan ──────────────────────────────────────────────
+  type EditableSession = {
+    id: string;
+    day: string;
+    type: string;
+    distance: string;
+    pace: string;
+    icon: string;
+    isCustom?: boolean;
+  };
+
+  const currentWeekNum = getCurrentWeek();
+  const baseWeekData = WEEKS.find((w) => w.week === currentWeekNum) ?? WEEKS[0];
+  const storageKey = `runai-week-${currentWeekNum}-sessions`;
+
+  const loadSessions = (): EditableSession[] => {
+    if (typeof window === "undefined") return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) return JSON.parse(raw) as EditableSession[];
+    } catch { /* ignore */ }
+    return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
+  };
+
+  const [weekSessions, setWeekSessions] = useState<EditableSession[]>(() => {
+    if (typeof window === "undefined") return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) return JSON.parse(raw) as EditableSession[];
+    } catch { /* ignore */ }
+    return baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
+  });
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<Partial<EditableSession>>({});
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSession, setNewSession] = useState<Omit<EditableSession, "id">>({
+    day: "Man",
+    type: "",
+    distance: "",
+    pace: "",
+    icon: "🏃",
+  });
+
+  const saveSessions = (sessions: EditableSession[]) => {
+    setWeekSessions(sessions);
+    try { localStorage.setItem(storageKey, JSON.stringify(sessions)); } catch { /* ignore */ }
+  };
+
+  const startEdit = (s: EditableSession) => {
+    setEditingId(s.id);
+    setEditDraft({ day: s.day, type: s.type, distance: s.distance, pace: s.pace, icon: s.icon });
+  };
+
+  const commitEdit = () => {
+    if (!editingId) return;
+    saveSessions(weekSessions.map((s) => s.id === editingId ? { ...s, ...editDraft } : s));
+    setEditingId(null);
+    setEditDraft({});
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditDraft({}); };
+
+  const deleteSession = (id: string) => saveSessions(weekSessions.filter((s) => s.id !== id));
+
+  const addSession = () => {
+    if (!newSession.type.trim()) return;
+    const s: EditableSession = { ...newSession, id: `custom-${Date.now()}`, isCustom: true };
+    saveSessions([...weekSessions, s]);
+    setNewSession({ day: "Man", type: "", distance: "", pace: "", icon: "🏃" });
+    setShowAddForm(false);
+  };
+
+  const resetToDefault = () => {
+    const defaults = baseWeekData.sessions.map((s, i) => ({ ...s, id: String(i) }));
+    saveSessions(defaults);
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
   const recentRuns = stravaData.recentRuns ?? [];
   const recentActivities = stravaData.recentActivities ?? [];
   const computed = stravaData.computed;
@@ -1551,50 +1634,246 @@ export default function DashboardClient({
         {/* ── Tab: Økter ── */}
         {activeTab === "okter" && (
           <div>
-            {/* Ukens plan */}
+            {/* Ukens plan — redigerbar */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-[#111110]">Ukens plan</h3>
-                <Link
-                  href="/plan"
-                  className="flex items-center gap-1 text-xs text-[#FC5200] font-semibold hover:underline"
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-sm font-bold text-[#111110]">
+                  Uke {currentWeekNum} – {baseWeekData.phase}
+                </h3>
+                <button
+                  onClick={resetToDefault}
+                  className="text-[10px] text-[#9B9B95] hover:text-[#6B6B65] underline"
+                  title="Tilbakestill til programmet"
                 >
-                  Se full plan <ChevronRight className="h-3 w-3" />
-                </Link>
+                  Nullstill
+                </button>
               </div>
+              <p className="text-[10px] text-[#9B9B95] mb-3">
+                Plan: {baseWeekData.totalKm} km · Fra halvmaraton_program_fullstendig.txt
+              </p>
 
               <PhaseCompletionBadge recentRuns={recentRuns} />
 
               <div className="space-y-2">
-                {planSessions.map((session, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
-                      session.done
-                        ? "bg-emerald-50 border border-emerald-200"
-                        : "bg-[#F8F8F7] border border-transparent hover:border-[#E5E5E2]"
-                    }`}
-                  >
-                    <span className="text-lg leading-none">{session.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#111110]">{session.day}</span>
-                        <span className="text-xs text-[#6B6B65] truncate">{session.type}</span>
+                {weekSessions.map((session) => {
+                  const done = isSessionDone(session.day, recentRuns);
+                  const isEditing = editingId === session.id;
+
+                  if (isEditing) {
+                    return (
+                      <div key={session.id} className="rounded-xl border border-[#FC5200] bg-orange-50 p-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Dag</label>
+                            <select
+                              value={editDraft.day ?? session.day}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, day: e.target.value }))}
+                              className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                            >
+                              {["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"].map((d) => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Ikon</label>
+                            <select
+                              value={editDraft.icon ?? session.icon}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, icon: e.target.value }))}
+                              className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                            >
+                              {["🏃", "⚡", "🔥", "🛣️", "💪", "😴", "🧘"].map((ic) => (
+                                <option key={ic} value={ic}>{ic}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type</label>
+                          <input
+                            type="text"
+                            value={editDraft.type ?? session.type}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, type: e.target.value }))}
+                            className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                            placeholder="f.eks. Terskelløkt"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Distanse / varighet</label>
+                            <input
+                              type="text"
+                              value={editDraft.distance ?? session.distance}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, distance: e.target.value }))}
+                              className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                              placeholder="f.eks. 8 km"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Pace / notat</label>
+                            <input
+                              type="text"
+                              value={editDraft.pace ?? session.pace}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, pace: e.target.value }))}
+                              className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                              placeholder="f.eks. 5:20/km"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={commitEdit}
+                            className="flex items-center gap-1 text-xs font-semibold bg-[#FC5200] text-white rounded-lg px-3 py-1.5 hover:bg-[#e04a00] transition-colors"
+                          >
+                            <Check className="h-3 w-3" /> Lagre
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="flex items-center gap-1 text-xs font-semibold bg-[#F0F0EE] text-[#6B6B65] rounded-lg px-3 py-1.5 hover:bg-[#E5E5E2] transition-colors"
+                          >
+                            <X className="h-3 w-3" /> Avbryt
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-[#9B9B95]">{session.distance}</span>
-                        <span className="text-[10px] text-[#9B9B95]">·</span>
-                        <span className="text-[10px] text-[#9B9B95]">{session.pace}</span>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={session.id}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors group ${
+                        done
+                          ? "bg-emerald-50 border border-emerald-200"
+                          : "bg-[#F8F8F7] border border-transparent hover:border-[#E5E5E2]"
+                      }`}
+                    >
+                      <span className="text-lg leading-none">{session.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[#111110]">{session.day}</span>
+                          <span className="text-xs text-[#6B6B65] truncate">{session.type}</span>
+                          {session.isCustom && (
+                            <span className="text-[9px] text-[#FC5200] bg-orange-50 border border-orange-200 rounded-full px-1.5 py-0 shrink-0">+</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-[#9B9B95]">{session.distance}</span>
+                          {session.pace && <><span className="text-[10px] text-[#9B9B95]">·</span>
+                          <span className="text-[10px] text-[#9B9B95]">{session.pace}</span></>}
+                        </div>
+                      </div>
+                      {done && (
+                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 rounded-full px-2 py-0.5 shrink-0">
+                          ✓ Gjort
+                        </span>
+                      )}
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <button
+                          onClick={() => startEdit(session)}
+                          className="p-1 rounded-lg hover:bg-[#E5E5E2] text-[#9B9B95] hover:text-[#111110] transition-colors"
+                          title="Rediger"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => deleteSession(session.id)}
+                          className="p-1 rounded-lg hover:bg-red-50 text-[#9B9B95] hover:text-red-500 transition-colors"
+                          title="Slett"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
                       </div>
                     </div>
-                    {session.done && (
-                      <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 rounded-full px-2 py-0.5 shrink-0">
-                        ✓ Gjort
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {/* Legg til ny økt */}
+              {showAddForm ? (
+                <div className="mt-3 rounded-xl border border-dashed border-[#FC5200] bg-orange-50 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-[#FC5200]">Ny økt</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Dag</label>
+                      <select
+                        value={newSession.day}
+                        onChange={(e) => setNewSession((s) => ({ ...s, day: e.target.value }))}
+                        className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                      >
+                        {["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"].map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Ikon</label>
+                      <select
+                        value={newSession.icon}
+                        onChange={(e) => setNewSession((s) => ({ ...s, icon: e.target.value }))}
+                        className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                      >
+                        {["🏃", "⚡", "🔥", "🛣️", "💪", "😴", "🧘"].map((ic) => (
+                          <option key={ic} value={ic}>{ic}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type *</label>
+                    <input
+                      type="text"
+                      value={newSession.type}
+                      onChange={(e) => setNewSession((s) => ({ ...s, type: e.target.value }))}
+                      className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                      placeholder="f.eks. Terskelløkt"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Distanse / varighet</label>
+                      <input
+                        type="text"
+                        value={newSession.distance}
+                        onChange={(e) => setNewSession((s) => ({ ...s, distance: e.target.value }))}
+                        className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                        placeholder="f.eks. 8 km"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Pace / notat</label>
+                      <input
+                        type="text"
+                        value={newSession.pace}
+                        onChange={(e) => setNewSession((s) => ({ ...s, pace: e.target.value }))}
+                        className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#FC5200]"
+                        placeholder="f.eks. 5:20/km"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={addSession}
+                      disabled={!newSession.type.trim()}
+                      className="flex items-center gap-1 text-xs font-semibold bg-[#FC5200] text-white rounded-lg px-3 py-1.5 hover:bg-[#e04a00] disabled:opacity-40 transition-colors"
+                    >
+                      <Plus className="h-3 w-3" /> Legg til
+                    </button>
+                    <button
+                      onClick={() => setShowAddForm(false)}
+                      className="flex items-center gap-1 text-xs font-semibold bg-[#F0F0EE] text-[#6B6B65] rounded-lg px-3 py-1.5 hover:bg-[#E5E5E2] transition-colors"
+                    >
+                      <X className="h-3 w-3" /> Avbryt
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-[#9B9B95] hover:text-[#FC5200] hover:border-[#FC5200] border border-dashed border-[#E5E5E2] rounded-xl py-2 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Legg til økt
+                </button>
+              )}
 
               {/* Ukens fremgangsbar */}
               <WeeklyProgressBar recentRuns={recentRuns} />
