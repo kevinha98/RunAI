@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -83,13 +83,13 @@ type Message = {
   timestamp: Date;
 };
 
-const SUGGESTED_QUESTIONS = [
-  "Hvorfor gjør jeg en terskeløkt i dag?",
-  "Jeg er sliten — bør jeg hoppe over langkjøringen?",
-  "Hvordan løper jeg mitt beste halvmaraton?",
-  "Kneet mitt gjør vondt. Hva bør jeg gjøre?",
-  "Kan du justere planen — jeg gikk glipp av denne uken?",
-];
+const QUICK_QUESTIONS = [
+  "Hvordan ser uka ut?",
+  "Hva bør jeg gjøre dagen før langturen?",
+  "Er jeg på rett spor mot maratonen?",
+  "Hva er riktig innsats på terskelløkt?",
+  "Hjelp meg med restitusjon",
+] as const;
 
 const INITIAL_MESSAGE: Message = {
   id: "0",
@@ -196,6 +196,14 @@ export default function CoachPage() {
     }
   }
 
+  function handleQuickQuestion(question: string) {
+    setInput(question);
+    sendMessage(question);
+  }
+
+  // Samtalen er "tom" hvis det ikke finnes noen brukermeldinger
+  const isConversationEmpty = messages.every((m) => m.role === "assistant");
+
   return (
     <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex flex-col">
       {/* Header */}
@@ -251,43 +259,51 @@ export default function CoachPage() {
         </div>
       </div>
 
-      {/* Suggested questions (only at start) */}
-      {messages.length === 1 && (
-        <div className="px-4 pb-4 max-w-3xl mx-auto w-full">
-          <div className="flex flex-wrap gap-2">
-            {SUGGESTED_QUESTIONS.map((q) => (
-              <button
-                key={q}
-                onClick={() => sendMessage(q)}
-                className="text-xs bg-white border border-[#E5E5E2] hover:border-[rgba(252,82,0,0.40)] px-3.5 py-2 rounded-xl text-[#6B6B65] hover:text-[#111110] transition-colors"
-              >
-                {q}
-              </button>
-            ))}
+      {/* Input area */}
+      <div className="border-t border-[#E5E5E2] bg-white">
+        {/* Quick question buttons – only shown when conversation is empty */}
+        {isConversationEmpty && (
+          <div className="px-4 pt-3 pb-0 max-w-3xl mx-auto w-full">
+            <p className="text-[10px] font-semibold text-[#9B9B95] uppercase tracking-wide mb-2">
+              Hurtigspørsmål
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-wrap">
+              {QUICK_QUESTIONS.map((question) => (
+                <button
+                  key={question}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handleQuickQuestion(question)}
+                  className="flex-shrink-0 text-xs font-medium px-3.5 py-2 rounded-xl border border-[#E5E5E2] bg-white text-[#6B6B65] hover:border-[rgba(252,82,0,0.40)] hover:text-[#111110] hover:bg-[#FFF8F5] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 whitespace-nowrap"
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Input */}
-      <div className="px-4 py-4 border-t border-[#E5E5E2] bg-white">
-        <div className="max-w-3xl mx-auto flex gap-3">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage(input)}
-            placeholder="Spør treneren din om hva som helst..."
-            disabled={loading}
-            className="flex-1 bg-white border border-[#E5E5E2] rounded-xl px-4 py-3 text-sm text-[#111110] placeholder-[#A0A09A] focus:outline-none focus:border-[#FC5200] transition-colors disabled:opacity-50"
-          />
-          <button
-            onClick={() => sendMessage(input)}
-            disabled={!input.trim() || loading}
-            className="bg-[#FC5200] text-white w-11 h-11 rounded-xl flex items-center justify-center hover:bg-[#E04800] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-          >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
+        {/* Text input */}
+        <div className="px-4 py-4">
+          <div className="max-w-3xl mx-auto flex gap-3">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage(input)}
+              placeholder="Spør treneren din om hva som helst..."
+              disabled={loading}
+              className="flex-1 bg-white border border-[#E5E5E2] rounded-xl px-4 py-3 text-sm text-[#111110] placeholder-[#A0A09A] focus:outline-none focus:border-[#FC5200] transition-colors disabled:opacity-50"
+            />
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim() || loading}
+              className="bg-[#FC5200] text-white w-11 h-11 rounded-xl flex items-center justify-center hover:bg-[#E04800] transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            </button>
+          </div>
         </div>
       </div>
     </div>
