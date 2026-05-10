@@ -34,7 +34,12 @@ export default async function PlanPage() {
             Klikk på en uke for å se alle enkeltøktene (mandag–søndag).
           </p>
 
-          <PlanTable weeks={WEEKS} currentWeek={currentWeek} userId={user.id} initialOverrides={initialOverrides} />
+          <PlanTable
+            weeks={WEEKS}
+            currentWeek={currentWeek}
+            userId={user.id}
+            initialOverrides={initialOverrides}
+          />
 
           <p className="text-xs text-[#9B9B95] mt-4">
             Totalt {WEEKS.length} uker &middot; Start 5. mai 2026 &middot; Løp 24. april 2027

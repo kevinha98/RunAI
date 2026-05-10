@@ -1,4 +1,4 @@
-import { TrendingUp, Activity, Clock, Zap, Calendar, ChevronRight } from "lucide-react";
+import { TrendingUp, Activity, Clock, Zap, Calendar } from "lucide-react";
 import DashboardSidebar from "../DashboardSidebar";
 import { readUserStats } from "@/lib/stats-store";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +37,7 @@ function formatWeekLabel(monday: Date): string {
 }
 
 function formatPaceFromSecPerKm(secPerKm: number): string {
-  if (!secPerKm || secPerKm <= 0) return "—";
+  if (!secPerKm || secPerKm <= 0) return "\u2014";
   const min = Math.floor(secPerKm / 60);
   const sec = Math.round(secPerKm % 60);
   return `${min}:${sec.toString().padStart(2, "0")}`;
@@ -58,7 +58,7 @@ function formatDate(iso: string): string {
 }
 
 function activityPaceStr(a: StravaActivity): string {
-  if (!a.distance || !a.moving_time) return "—";
+  if (!a.distance || !a.moving_time) return "\u2014";
   const secPerKm = a.moving_time / (a.distance / 1000);
   return formatPaceFromSecPerKm(secPerKm) + "/km";
 }
@@ -239,7 +239,6 @@ function WeeklyPaceLineChart({ data }: { data: WeeklySlot[] }) {
     label: d.label,
   }));
 
-  // Build path only through valid points
   const validPts = pts.filter((p) => p.y !== null) as {
     x: number;
     y: number;
@@ -256,7 +255,6 @@ function WeeklyPaceLineChart({ data }: { data: WeeklySlot[] }) {
       ? `${pathD} L${validPts[validPts.length - 1].x.toFixed(1)},${H} L${validPts[0].x.toFixed(1)},${H} Z`
       : "";
 
-  // Trend: lower pace = faster = good
   const firstPace = validPaces[0];
   const lastPace = validPaces[validPaces.length - 1];
   const trendDiff = lastPace - firstPace;
@@ -274,7 +272,7 @@ function WeeklyPaceLineChart({ data }: { data: WeeklySlot[] }) {
             : trendDiff > 5
             ? "Farten synker"
             : "Stabil fart"}{" "}
-          · siste {validSlots.length} uker
+          &middot; siste {validSlots.length} uker
         </span>
       </div>
       <svg
@@ -396,12 +394,47 @@ function ActivityList({ runs }: { runs: StravaActivity[] }) {
   );
 }
 
+// ── Summary Stats Card ────────────────────────────────────────────────────────
+
+function SummaryStatCard({
+  icon,
+  label,
+  value,
+  unit,
+  sub,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  unit?: string;
+  sub: string;
+}) {
+  return (
+    <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
+      <div className="flex items-center gap-1.5 text-xs text-[#6B6B65] mb-2 font-medium">
+        {icon}
+        {label}
+      </div>
+      <div className="text-xl font-black tracking-tight">
+        {value}
+        {unit && (
+          <span className="text-xs font-normal text-[#6B6B65] ml-1">{unit}</span>
+        )}
+      </div>
+      <div className="text-xs text-[#6B6B65] mt-0.5">{sub}</div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ProgressPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
   const stats = await readUserStats(user.id);
 
   const allActivities = stats?.recentActivities ?? [];
@@ -458,57 +491,38 @@ export default async function ProgressPage() {
           <div className="max-w-4xl">
             {/* Stat-kort */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
-                <div className="flex items-center gap-1.5 text-xs text-[#6B6B65] mb-2 font-medium">
-                  <Activity size={12} className="text-[#FC5200]" />
-                  Totalt km
-                </div>
-                <div className="text-xl font-black tracking-tight">
-                  {Math.round(totalKm)}
-                  <span className="text-xs font-normal text-[#6B6B65] ml-1">km</span>
-                </div>
-                <div className="text-xs text-[#6B6B65] mt-0.5">{totalRuns} løp</div>
-              </div>
-
-              <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
-                <div className="flex items-center gap-1.5 text-xs text-[#6B6B65] mb-2 font-medium">
-                  <Calendar size={12} className="text-[#FC5200]" />
-                  Snitt/uke
-                </div>
-                <div className="text-xl font-black tracking-tight">
-                  {avgKmPerWeek.toFixed(1)}
-                  <span className="text-xs font-normal text-[#6B6B65] ml-1">km</span>
-                </div>
-                <div className="text-xs text-[#6B6B65] mt-0.5">siste 12 uker</div>
-              </div>
-
-              <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
-                <div className="flex items-center gap-1.5 text-xs text-[#6B6B65] mb-2 font-medium">
-                  <Zap size={12} className="text-[#FC5200]" />
-                  Beste uke
-                </div>
-                <div className="text-xl font-black tracking-tight">
-                  {bestWeekKm.toFixed(1)}
-                  <span className="text-xs font-normal text-[#6B6B65] ml-1">km</span>
-                </div>
-                <div className="text-xs text-[#6B6B65] mt-0.5">siste 12 uker</div>
-              </div>
-
-              <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
-                <div className="flex items-center gap-1.5 text-xs text-[#6B6B65] mb-2 font-medium">
-                  <Clock size={12} className="text-[#FC5200]" />
-                  Snittfart
-                </div>
-                <div className="text-xl font-black tracking-tight">
-                  {overallAvgPace
+              <SummaryStatCard
+                icon={<Activity size={12} className="text-[#FC5200]" />}
+                label="Totalt km"
+                value={String(Math.round(totalKm))}
+                unit="km"
+                sub={`${totalRuns} løp`}
+              />
+              <SummaryStatCard
+                icon={<Calendar size={12} className="text-[#FC5200]" />}
+                label="Snitt/uke"
+                value={avgKmPerWeek.toFixed(1)}
+                unit="km"
+                sub="siste 12 uker"
+              />
+              <SummaryStatCard
+                icon={<Zap size={12} className="text-[#FC5200]" />}
+                label="Beste uke"
+                value={bestWeekKm.toFixed(1)}
+                unit="km"
+                sub="siste 12 uker"
+              />
+              <SummaryStatCard
+                icon={<Clock size={12} className="text-[#FC5200]" />}
+                label="Snittfart"
+                value={
+                  overallAvgPace
                     ? formatPaceFromSecPerKm(overallAvgPace)
-                    : "—"}
-                  {overallAvgPace && (
-                    <span className="text-xs font-normal text-[#6B6B65] ml-1">/km</span>
-                  )}
-                </div>
-                <div className="text-xs text-[#6B6B65] mt-0.5">siste 12 uker</div>
-              </div>
+                    : "\u2014"
+                }
+                unit={overallAvgPace ? "/km" : undefined}
+                sub="siste 12 uker"
+              />
             </div>
 
             {/* Ukentlig km bar chart */}
@@ -523,23 +537,35 @@ export default async function ProgressPage() {
                   <p className="text-sm text-[#6B6B65]">Ingen løp registrert ennå</p>
                 </div>
               ) : (
-                <WeeklyKmBarChart data={weeklyData} />
+                <div className="overflow-x-auto">
+                  <div style={{ minWidth: "320px" }}>
+                    <WeeklyKmBarChart data={weeklyData} />
+                  </div>
+                </div>
               )}
             </div>
 
             {/* Fart per uke linjediagram */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5 mb-5 hover:border-[#C8C8C4] transition-colors">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold text-[#111110]">Gjennomsnittsfart per uke</h2>
+                <h2 className="text-sm font-bold text-[#111110]">
+                  Gjennomsnittsfart per uke
+                </h2>
                 <span className="text-xs text-[#6B6B65]">Siste 12 uker</span>
               </div>
-              <WeeklyPaceLineChart data={weeklyData} />
+              <div className="overflow-x-auto">
+                <div style={{ minWidth: "320px" }}>
+                  <WeeklyPaceLineChart data={weeklyData} />
+                </div>
+              </div>
             </div>
 
             {/* Siste 20 aktiviteter */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5 hover:border-[#C8C8C4] transition-colors">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold text-[#111110]">Siste aktiviteter</h2>
+                <h2 className="text-sm font-bold text-[#111110]">
+                  Siste aktiviteter
+                </h2>
                 <span className="text-xs text-[#6B6B65]">
                   {Math.min(runs.length, 20)} av {runs.length}
                 </span>
