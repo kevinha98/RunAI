@@ -253,27 +253,43 @@ Bruk verktøyene proaktivt når spørsmålet krever mer data enn det som er i at
 // ─── Route handler ────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const stats = user
-      ? await readUserStats(user.id)
-      : {
-          athlete: null,
-          computed: { weeklyKm: 0, weeklyRuns: 0, avgPaceSecPerKm: 0, longestRunKm: 0, totalRunsAllTime: 0, totalKmAllTime: 0, ytdKm: 0 },
-          recentRuns: [],
-          recentActivities: [],
-          stravaStats: null,
-          lastSync: "",
-        };
-
     const body = await req.json();
-    const { messages } = body as {
+    const { messages, userId: bodyUserId } = body as {
       messages: { role: "user" | "assistant"; content: string }[];
+      userId?: string;
     };
 
     if (!messages || !Array.isArray(messages)) {
       return new Response("Invalid request body", { status: 400 });
     }
+
+    // Resolve userId: from body first, then from Supabase session
+    let resolvedUserId: string | null = bodyUserId ?? null;
+    if (!resolvedUserId) {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      resolvedUserId = user?.id ?? null;
+    }
+
+    // Load stats (falls back to empty stats if no userId)
+    const stats: StoredStats = resolvedUserId
+      ? await readUserStats(resolvedUserId)
+      : {
+          athlete: null,
+          computed: {
+            weeklyKm: 0,
+            weeklyRuns: 0,
+            avgPaceSecPerKm: 0,
+            longestRunKm: 0,
+            totalRunsAllTime: 0,
+            totalKmAllTime: 0,
+            ytdKm: 0,
+          },
+          recentRuns: [],
+          recentActivities: [],
+          stravaStats: null,
+          lastSync: "",
+        };
 
     // Context window management: keep last N messages, always end on a user message
     let trimmed = messages

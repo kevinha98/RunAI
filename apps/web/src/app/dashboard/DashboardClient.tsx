@@ -16,9 +16,10 @@ import {
   Zap,
   Timer,
   BarChart2,
+  Trophy,
 } from "lucide-react";
 import type { StoredStats, StravaActivity } from "@/lib/strava-types";
-import { formatPace, computePaceZoneDistribution } from "@/lib/strava-types";
+import { formatPace, computePaceZoneDistribution, computePersonalBests } from "@/lib/strava-types";
 import { getCurrentWeek, WEEKS, PLAN_START, RACE_DATE as RACE_DATE_OBJ } from "@/lib/plan-data";
 import type { Phase } from "@/lib/plan-data";
 
@@ -71,22 +72,32 @@ function getISOWeekKey(date: Date): string {
 }
 
 /**
- * Checks whether a planned session has a matching Strava activity on the same weekday in the current week.
+ * Returns 'YYYY-MM-DD' for a StravaActivity based on start_date_local.
+ */
+function getActivityDateStr(activity: StravaActivity): string {
+  return new Date(activity.start_date_local).toLocaleDateString("sv-SE");
+}
+
+/**
+ * Returns 'YYYY-MM-DD' for the planned session day in the current week.
+ */
+function getSessionDate(sessionDay: string): string {
+  const targetDayIdx = DAY_IDX[sessionDay];
+  if (targetDayIdx === undefined) return "";
+  const weekStart = getWeekStart(new Date()); // Monday
+  const diffFromMonday = targetDayIdx === 0 ? 6 : targetDayIdx - 1;
+  const sessionDate = new Date(weekStart);
+  sessionDate.setDate(weekStart.getDate() + diffFromMonday);
+  return sessionDate.toLocaleDateString("sv-SE");
+}
+
+/**
+ * Checks whether a planned session has a matching Strava activity on the exact same date.
  */
 function isSessionDone(sessionDay: string, recentRuns: StravaActivity[]): boolean {
-  const targetDayIdx = DAY_IDX[sessionDay];
-  if (targetDayIdx === undefined) return false;
-  const now = new Date();
-  const weekStart = getWeekStart(now);
-  const weekEnd = getWeekEnd(now);
-  return recentRuns.some((run) => {
-    const runDate = new Date(run.start_date_local);
-    return (
-      runDate >= weekStart &&
-      runDate <= weekEnd &&
-      runDate.getDay() === targetDayIdx
-    );
-  });
+  const sessionDateStr = getSessionDate(sessionDay);
+  if (!sessionDateStr) return false;
+  return recentRuns.some((run) => getActivityDateStr(run) === sessionDateStr);
 }
 
 function getPlanSessions(recentRuns: StravaActivity[]) {
@@ -197,6 +208,148 @@ function clampTooltipX(cx: number, tooltipW: number, svgW: number): number {
 function clampTooltipY(cy: number, tooltipH: number, minY: number): number {
   const above = cy - tooltipH - 8;
   return above < minY ? cy + 12 : above;
+}
+
+/**
+ * Formats total seconds as 'H:MM:SS' (with hours) or 'M:SS' (under 1 hour).
+ */
+function formatPRTime(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds <= 0) return "—";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// ── Aktivitetskalender-hjelpefunksjoner ──────────────────────────────────────
+
+/**
+ * Builds a map from 'YYYY-MM-DD' → total km run that day.
+ */
+function buildActivityHeatmap(runs: StravaActivity[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const run of runs) {
+    const dateStr = new Date(run.start_date_local).toLocaleDateString("sv-SE");
+    map.set(dateStr, (map.get(dateStr) ?? 0) + run.distance / 1000);
+  }
+  return map;
+}
+
+/**
+ * Returns a Tailwind bg-color class based on km run on a given day.
+ * 0 km → white, <5 → light green, 5-10 → medium green, >10 → dark green.
+ */
+function getDayColor(km: number): string {
+  if (km <= 0) return "bg-white border border-gray-200";
+  if (km < 5)  return "bg-green-200";
+  if (km <= 10) return "bg-green-500";
+  return "bg-green-800";
+}
+
+/**
+ * Returns an array of 56 Date objects for the last 8 weeks,
+ * starting from the Monday 8 weeks ago.
+ */
+function getLast8WeeksDays(): Date[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayMonday = getWeekStart(today);
+  const startMonday = new Date(todayMonday);
+  startMonday.setDate(todayMonday.getDate() - 7 * 7);
+  const days: Date[] = [];
+  for (let i = 0; i < 56; i++) {
+    const d = new Date(startMonday);
+    d.setDate(startMonday.getDate() + i);
+    days.push(d);
+  }
+  return days;
+}
+
+// ── ActivityCalendar-komponent ────────────────────────────────────────────────
+
+function ActivityCalendar({ runs }: { runs: StravaActivity[] }) {
+  const heatmap = useMemo(() => buildActivityHeatmap(runs), [runs]);
+  const days = useMemo(() => getLast8WeeksDays(), []);
+  const todayStr = useMemo(() => new Date().toLocaleDateString("sv-SE"), []);
+
+  // Split into 8 weeks of 7 days (each week is a column, Mon-Sun)
+  const weeks: Date[][] = [];
+  for (let w = 0; w < 8; w++) {
+    weeks.push(days.slice(w * 7, w * 7 + 7));
+  }
+
+  const dayLabels = ["M", "T", "O", "T", "F", "L", "S"];
+
+  return (
+    <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-[#111110]">Aktivitetskalender</h3>
+        <span className="text-xs text-[#6B6B65]">Siste 8 uker</span>
+      </div>
+      <div className="flex gap-1">
+        {/* Dag-etiketter */}
+        <div className="flex flex-col gap-[3px] mr-1">
+          {dayLabels.map((label, i) => (
+            <span
+              key={i}
+              className="text-[9px] text-[#9B9B95] leading-none flex items-center"
+              style={{ height: "12px" }}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+        {/* Uker som kolonner */}
+        {weeks.map((week, wi) => {
+          const firstDay = week[0];
+          const monthLabel = wi === 0 || firstDay.getDate() <= 7
+            ? firstDay.toLocaleDateString("nb-NO", { month: "short" })
+            : "";
+          return (
+            <div key={wi} className="flex flex-col">
+              {/* Månedslabel over kolonnen */}
+              <span className="text-[9px] text-[#9B9B95] leading-none mb-1 h-3">
+                {monthLabel}
+              </span>
+              <div className="flex flex-col gap-[3px]">
+                {week.map((day, di) => {
+                  const dateStr = day.toLocaleDateString("sv-SE");
+                  const km = heatmap.get(dateStr) ?? 0;
+                  const colorClass = getDayColor(km);
+                  const isToday = dateStr === todayStr;
+                  const isFuture = day > new Date();
+                  return (
+                    <div
+                      key={di}
+                      title={isFuture ? dateStr : `${dateStr}: ${km > 0 ? km.toFixed(1) + " km" : "Ingen økt"}`}
+                      className={`rounded-sm cursor-default transition-opacity hover:opacity-75 ${
+                        isFuture ? "bg-[#F5F5F3] border border-[#EBEBEA]" : colorClass
+                      } ${isToday ? "ring-1 ring-[#FC5200] ring-offset-0" : ""}`}
+                      style={{ width: "12px", height: "12px" }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Forklaring */}
+      <div className="flex items-center gap-3 mt-3">
+        <span className="text-[10px] text-[#9B9B95]">Mindre</span>
+        <div className="flex gap-1">
+          <div className="w-3 h-3 rounded-sm bg-white border border-gray-200" title="0 km" />
+          <div className="w-3 h-3 rounded-sm bg-green-200" title="< 5 km" />
+          <div className="w-3 h-3 rounded-sm bg-green-500" title="5–10 km" />
+          <div className="w-3 h-3 rounded-sm bg-green-800" title="> 10 km" />
+        </div>
+        <span className="text-[10px] text-[#9B9B95]">Mer</span>
+      </div>
+    </div>
+  );
 }
 
 // Pulserende grønn dot-indikator
@@ -677,477 +830,509 @@ function EmptyRunsBanner({ onSync, isSyncing, athleteId }: {
           className="inline-flex items-center gap-2 rounded-xl border border-[#E5E5E2] bg-white px-5 py-2.5 text-sm font-semibold text-[#111110] hover:border-[#C8C8C4] transition-colors"
         >
           <StravaIcon />
-          Åpne Strava-profil
+          Åpne Strava
         </a>
       </div>
-
-      <p className="text-xs text-gray-400 mt-1">
-        Husk at aktiviteter må være satt til «public» eller «followers» på Strava for å bli hentet.
-      </p>
     </div>
   );
 }
 
-// Main component
+// ── DashboardClient ───────────────────────────────────────────────────────────
 
-interface Props { stravaData: StoredStats; stravaStatus?: string | null; }
-
-export default function DashboardClient({ stravaData, stravaStatus }: Props) {
+export default function DashboardClient({
+  stravaData,
+  stravaStatus,
+}: {
+  stravaData: StoredStats;
+  stravaStatus: string | null;
+}) {
   const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"oversikt" | "aktiviteter" | "statistikk">("oversikt");
+  const [expandedActivity, setExpandedActivity] = useState<number | null>(null);
+
+  const { athlete, recentRuns, computed, lastSync } = stravaData;
+  const { avgPaceSecPerKm } = computed;
+
+  const isStravaConnected = !!athlete;
+  const hasRuns = recentRuns.length > 0;
+
+  // Show sync status from URL param
+  useEffect(() => {
+    if (stravaStatus === "connected") {
+      setSyncMessage("Strava-konto koblet til! 🎉");
+      setTimeout(() => setSyncMessage(null), 5000);
+    } else if (stravaStatus === "error") {
+      setSyncMessage("Noe gikk galt med Strava-tilkoblingen.");
+      setTimeout(() => setSyncMessage(null), 5000);
+    }
+  }, [stravaStatus]);
 
   const handleSync = useCallback(async () => {
     setIsSyncing(true);
+    setSyncMessage(null);
     try {
       const res = await fetch("/api/strava/sync", { method: "POST" });
+      const data = await res.json();
       if (res.ok) {
+        setSyncMessage(`Synkronisert! ${data.count ?? ""} aktiviteter hentet.`);
         router.refresh();
+      } else {
+        setSyncMessage(data.error ?? "Synkronisering feilet.");
       }
+    } catch {
+      setSyncMessage("Nettverksfeil under synkronisering.");
     } finally {
       setIsSyncing(false);
+      setTimeout(() => setSyncMessage(null), 6000);
     }
   }, [router]);
 
-  const minutesSinceSync = stravaData.lastSync
-    ? Math.round((Date.now() - new Date(stravaData.lastSync).getTime()) / 60000)
-    : null;
+  const planSessions = useMemo(() => getPlanSessions(recentRuns), [recentRuns]);
 
-  const { computed, athlete, recentRuns, stravaStats } = stravaData;
-  const hasData = athlete !== null;
-  const hasRuns = recentRuns.length > 0;
-  const athleteName = athlete?.firstname ?? null;
-
-  const todayIdx = new Date().getDay();
-
-  // ─── Bakgrunns-polling hvert 10. minutt ───────────────────────────────────
-  useEffect(() => {
-    const shouldPoll =
-      hasData &&
-      hasRuns &&
-      minutesSinceSync !== null &&
-      minutesSinceSync > 10;
-
-    if (!shouldPoll) return;
-
-    const intervalId = setInterval(() => {
-      router.refresh();
-    }, 600_000);
-
-    return () => clearInterval(intervalId);
-  }, [hasData, hasRuns, minutesSinceSync, router]);
-
-  // Build weekly plan sessions with done-state based on Strava activities
-  const thisWeek = useMemo(
-    () =>
-      getPlanSessions(recentRuns).map((d) => ({
-        ...d,
-        today: d.dayIdx === todayIdx,
-      })),
-    [recentRuns, todayIdx]
-  );
-
-  const today = thisWeek.find((d) => d.today);
-  const daysUntilRace = Math.ceil((new Date(RACE_DATE).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-
-  const runsWithPace = useMemo(
-    () => recentRuns.filter((r) => r.distance > 0 && r.moving_time > 0),
-    [recentRuns]
-  );
-
-  const bestPace = useMemo(() => {
-    if (!runsWithPace.length) return 0;
-    return Math.min(...runsWithPace.map((r) => activityPaceSec(r)));
-  }, [runsWithPace]);
-
-  const avgHR = useMemo(() => {
-    const runsWithHR = runsWithPace.filter((r) => r.average_heartrate);
-    if (!runsWithHR.length) return null;
-    return Math.round(
-      runsWithHR.reduce((s, r) => s + (r.average_heartrate ?? 0), 0) / runsWithHR.length
-    );
-  }, [runsWithPace]);
-
-  const totalElevationMonth = useMemo(() => {
-    const now = new Date();
-    return recentRuns
-      .filter((r) => {
-        const d = new Date(r.start_date_local);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      })
-      .reduce((s, r) => s + (r.total_elevation_gain ?? 0), 0);
+  const weeklyBuckets = useMemo(() => {
+    const buckets = weeklyKmBuckets(recentRuns, 8);
+    return buckets.map((b) => ({ label: b.label, value: b.km }));
   }, [recentRuns]);
 
-  const avgSpeedKmh = useMemo(() => {
-    if (!runsWithPace.length) return 0;
-    return runsWithPace.reduce((s, r) => s + (r.average_speed ?? 0), 0) / runsWithPace.length * 3.6;
-  }, [runsWithPace]);
+  const personalBests = useMemo(() => computePersonalBests(recentRuns), [recentRuns]);
 
-  const weeklyBuckets = useMemo(
-    () => weeklyKmBuckets(recentRuns, 8),
-    [recentRuns]
-  );
+  const lastSyncLabel = useMemo(() => {
+    if (!lastSync) return "Aldri synkronisert";
+    const d = new Date(lastSync);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "Nettopp synkronisert";
+    if (diffMin < 60) return `${diffMin} min siden`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH}t siden`;
+    return d.toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+  }, [lastSync]);
 
-  const recentRunCount = stravaStats?.recent_run_totals?.count ?? 0;
-  const ytdElevation = Math.round(
-    ((stravaStats?.ytd_run_totals as { elevation_gain?: number } | null)?.elevation_gain) ?? 0
-  );
-
-  const avgRunDistKm = useMemo(() => {
-    if (!runsWithPace.length) return 0;
-    return runsWithPace.reduce((s, r) => s + r.distance / 1000, 0) / runsWithPace.length;
-  }, [runsWithPace]);
-
-  const { last5Pace, prev5Pace, paceDelta } = useMemo(() => {
-    const last5 = runsWithPace.slice(0, 5);
-    const prev5 = runsWithPace.slice(5, 10);
-    const last5PaceSec = last5.length
-      ? last5.reduce((s, r) => s + activityPaceSec(r), 0) / last5.length
-      : 0;
-    const prev5PaceSec = prev5.length
-      ? prev5.reduce((s, r) => s + activityPaceSec(r), 0) / prev5.length
-      : 0;
-    const delta = prev5PaceSec > 0 ? prev5PaceSec - last5PaceSec : 0;
-    return { last5Pace: last5PaceSec, prev5Pace: prev5PaceSec, paceDelta: delta };
-  }, [runsWithPace]);
-
-  // suppress unused var warning
-  void prev5Pace;
-  void last5Pace;
-
-  const { currentPhase } = getMarathonProgress();
-  const currentWeek = getCurrentWeek();
-
-  // Friskhet-indikator: data ferskere enn 2 minutter
-  const isFreshSync = minutesSinceSync !== null && minutesSinceSync < 2;
+  const isSyncFresh = useMemo(() => {
+    if (!lastSync) return false;
+    return new Date().getTime() - new Date(lastSync).getTime() < 5 * 60 * 1000;
+  }, [lastSync]);
 
   return (
-    <div className="flex-1 md:ml-60 p-4 md:p-8 pb-24 md:pb-8 min-w-0">
-      {/* Strava feilvarsel */}
-      {stravaStatus && ["token_expired", "fetch_error", "error"].includes(stravaStatus) && (
-        <div className="mb-4 flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-sm">
-          <span className="text-orange-800">Strava-tilkoblingen er utløpt eller har feil. Data kan være utdatert.</span>
-          <Link href="/api/strava/connect" className="ml-4 text-[#FC5200] font-semibold hover:underline whitespace-nowrap">Koble til på nytt</Link>
-        </div>
-      )}
+    <main className="flex-1 min-h-screen overflow-y-auto">
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Mobile Marathon Banner */}
+        <MobileMarathonBanner />
 
-      {/* Mobile top bar */}
-      <div className="flex md:hidden items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-[#FC5200] rounded-lg flex items-center justify-center">
-            <span className="text-white font-black text-xs">R</span>
-          </div>
-          <span className="font-bold text-base">RunAI</span>
-        </div>
-        <button
-          onClick={handleSync}
-          disabled={isSyncing}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E5E5E2] bg-white hover:border-[#C8C8C4] transition-colors disabled:opacity-50"
-        >
-          <Zap size={11} className="text-[#FC5200]" />
-          {isSyncing ? "Synker…" : "Synk"}
-        </button>
-      </div>
-
-      {/* Mobile Marathon Banner */}
-      <MobileMarathonBanner />
-
-      {/* Header */}
-      <div className="hidden md:flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">
-            {athleteName ? `Hei, ${athleteName} 👋` : "Dashboard"}
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-sm text-[#6B6B65]">
-              {daysUntilRace > 0
-                ? `${daysUntilRace} dager til Bergen City Marathon`
-                : "Bergen City Marathon — løpsdagen er her!"}
-            </p>
-            <span className="text-[#C8C8C4]">·</span>
-            <span className="text-sm text-[#6B6B65]">Uke {currentWeek}</span>
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPhaseBadgeClass(currentPhase)}`}
-            >
-              {currentPhase}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Sync status med friskhet-indikator */}
-          {minutesSinceSync !== null && (
-            <span className="flex items-center gap-1.5 text-xs text-[#6B6B65]">
-              {isFreshSync && <SyncFreshDot />}
-              {minutesSinceSync === 0
-                ? "Synkronisert nå nettopp"
-                : `Synkronisert ${minutesSinceSync} min siden`}
-            </span>
-          )}
-          <button
-            onClick={handleSync}
-            disabled={isSyncing}
-            className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-[#E5E5E2] bg-white hover:border-[#C8C8C4] transition-colors disabled:opacity-50"
-          >
-            <Zap size={13} className="text-[#FC5200]" />
-            {isSyncing ? "Synkroniserer…" : "Synkroniser"}
-          </button>
-        </div>
-      </div>
-
-      {/* Empty state — connected but no runs */}
-      {hasData && !hasRuns && (
-        <EmptyRunsBanner
-          onSync={handleSync}
-          isSyncing={isSyncing}
-          athleteId={athlete?.id}
-        />
-      )}
-
-      {/* Not connected */}
-      {!hasData && (
-        <div className="mb-6 rounded-2xl border border-dashed border-[#E5E5E2] bg-white p-8 flex flex-col items-center gap-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-[#F5F5F3] flex items-center justify-center">
-            <StravaIcon />
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-base font-semibold">Koble til Strava</p>
-            <p className="text-sm text-[#6B6B65] max-w-sm">
-              Koble til Strava-kontoen din for å se treningsdata, fremgang og personlig statistikk.
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight">
+              {athlete ? `Hei, ${athlete.firstname}! 👋` : "Dashboard"}
+            </h1>
+            <p className="text-sm text-[#6B6B65] mt-0.5">
+              {hasRuns
+                ? `${recentRuns.length} løp synkronisert`
+                : "Ingen løp ennå"}
             </p>
           </div>
-          <Link
-            href="/api/strava/connect"
-            className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: STRAVA_ORANGE }}
-          >
-            <StravaIcon />
-            Koble til Strava
-          </Link>
-        </div>
-      )}
-
-      {hasRuns && (
-        <>
-          {/* Stat cards grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <WeeklyProgressBar runs={recentRuns} />
-
-            <StatCard
-              icon={<Activity size={13} className="text-[#FC5200]" />}
-              label="Totalt km (år)"
-              value={Math.round(computed.ytdKm).toString()}
-              unit="km"
-              sub={`${computed.totalRunsAllTime} løp totalt`}
-            />
-            <StatCard
-              icon={<Timer size={13} className="text-[#FC5200]" />}
-              label="Snittempo"
-              value={computed.avgPaceSecPerKm > 0 ? formatPace(computed.avgPaceSecPerKm) : "—"}
-              unit="/km"
-              sub={
-                paceDelta > 5
-                  ? `↑ ${formatPace(Math.abs(paceDelta))} raskere`
-                  : paceDelta < -5
-                  ? `↓ ${formatPace(Math.abs(paceDelta))} tregere`
-                  : "Stabil form"
-              }
-              subColor={
-                paceDelta > 5
-                  ? "text-emerald-600"
-                  : paceDelta < -5
-                  ? "text-red-500"
-                  : "text-[#6B6B65]"
-              }
-            />
-            <StatCard
-              icon={<Zap size={13} className="text-[#FC5200]" />}
-              label="Beste tempo"
-              value={bestPace > 0 ? formatPace(bestPace) : "—"}
-              unit="/km"
-              sub="Raskeste løp"
-            />
-            <StatCard
-              icon={<Mountain size={13} className="text-[#FC5200]" />}
-              label="Høydemeter (mnd)"
-              value={Math.round(totalElevationMonth).toString()}
-              unit="m"
-              sub={`${ytdElevation} m i år`}
-            />
-            <StatCard
-              icon={<Heart size={13} className="text-[#FC5200]" />}
-              label="Snitt puls"
-              value={avgHR ? avgHR.toString() : "—"}
-              unit="bpm"
-              sub="Siste løp med HR"
-            />
-            <StatCard
-              icon={<Play size={13} className="text-[#FC5200]" />}
-              label="Snitt distanse"
-              value={avgRunDistKm > 0 ? avgRunDistKm.toFixed(1) : "—"}
-              unit="km"
-              sub={`${recentRunCount} løp siste 4 uker`}
-            />
-            <StatCard
-              icon={<TrendingUp size={13} className="text-[#FC5200]" />}
-              label="Snittfart"
-              value={avgSpeedKmh > 0 ? avgSpeedKmh.toFixed(1) : "—"}
-              unit="km/t"
-              sub={metersToKm(computed.longestRunKm * 1000) + " km lengste løp"}
-            />
-          </div>
-
-          {/* Weekly plan + Recent runs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            {/* This week plan */}
-            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-sm">Denne uken</h3>
-                <Link
-                  href="/plan"
-                  className="text-xs text-[#FC5200] font-semibold flex items-center gap-0.5 hover:underline"
-                >
-                  Se full plan <ChevronRight size={12} />
-                </Link>
-              </div>
-              <div className="space-y-2">
-                {thisWeek.map((s, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
-                      s.today
-                        ? "bg-[#FFF5F0] border border-[rgba(252,82,0,0.2)]"
-                        : "hover:bg-[#F8F8F6]"
-                    }`}
-                  >
-                    <span className="text-base leading-none">{s.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-bold ${
-                          s.today ? "text-[#FC5200]" : "text-[#6B6B65]"
-                        }`}>{s.day}</span>
-                        {s.today && (
-                          <span className="text-[10px] font-semibold bg-[#FC5200] text-white px-1.5 py-0.5 rounded-full leading-none">
-                            I dag
-                          </span>
-                        )}
-                        {s.done && (
-                          <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full leading-none">
-                            ✓ Fullført
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#111110] font-medium truncate">{s.type}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-bold">{s.distance}</p>
-                      <p className="text-[10px] text-[#6B6B65]">{s.pace}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent runs */}
-            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-sm">Siste løp</h3>
-                <span className="text-xs text-[#6B6B65]">{recentRuns.length} aktiviteter</span>
-              </div>
-              <div className="space-y-2">
-                {recentRuns.slice(0, 5).map((run, i) => (
-                  <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F8F8F6] transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-[#FFF5F0] flex items-center justify-center shrink-0">
-                      <Activity size={14} className="text-[#FC5200]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold truncate">{run.name}</p>
-                      <p className="text-[10px] text-[#6B6B65]">{formatDate(run.start_date_local)}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-bold">{metersToKm(run.distance)} km</p>
-                      <p className="text-[10px] text-[#6B6B65]">{activityPace(run)}/km</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Charts row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* Weekly km chart */}
-            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-sm">Ukentlig km</h3>
-                <span className="text-xs text-[#6B6B65]">Siste 8 uker</span>
-              </div>
-              {weeklyBuckets.length > 0 ? (
-                <BarChart
-                  data={weeklyBuckets.map((b) => ({ label: b.label, value: b.km }))}
-                />
-              ) : (
-                <p className="text-xs text-[#6B6B65]">Ingen data ennå</p>
-              )}
-            </div>
-
-            {/* Pace trend chart */}
-            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-sm">Tempotrend</h3>
-                <span className="text-xs text-[#6B6B65]">Siste 10 løp</span>
-              </div>
-              <PaceTrendChart runs={recentRuns} />
-            </div>
-
-            {/* Zone distribution */}
-            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-5">
-              <ZoneDistributionChart
-                runs={recentRuns}
-                avgPaceSecPerKm={computed.avgPaceSecPerKm}
-              />
-            </div>
-          </div>
-
-          {/* AI Coach CTA */}
-          <div className="bg-[#1C1C1A] rounded-2xl p-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#FC5200] flex items-center justify-center shrink-0">
-                <Brain size={18} className="text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">
-                  {today
-                    ? `I dag: ${today.type} — ${today.distance}`
-                    : "AI-trenerens analyse"}
-                </p>
-                <p className="text-xs text-[#8A8A85]">
-                  {today
-                    ? `Få personlig veiledning for dagens økt`
-                    : "Spør om treningsplan, løpsteknikk eller skadeforebygging"}
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/coach"
-              className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#FC5200] px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity shrink-0"
-            >
-              <MessageCircle size={13} />
-              Chat
-            </Link>
-          </div>
-
-          {/* Mobile sync status */}
-          <div className="md:hidden mt-4 flex items-center justify-center gap-1.5">
-            {isFreshSync && <SyncFreshDot />}
-            {minutesSinceSync !== null && (
-              <span className="text-xs text-[#6B6B65]">
-                {minutesSinceSync === 0
-                  ? "Synkronisert nå nettopp"
-                  : `Synkronisert ${minutesSinceSync} min siden`}
-              </span>
+          <div className="flex items-center gap-2">
+            {isStravaConnected ? (
+              <button
+                onClick={handleSync}
+                disabled={isSyncing}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-[#E5E5E2] bg-white hover:border-[#C8C8C4] transition-colors disabled:opacity-50"
+              >
+                {isSyncing ? (
+                  <span className="animate-spin">⟳</span>
+                ) : isSyncFresh ? (
+                  <SyncFreshDot />
+                ) : (
+                  <StravaIcon />
+                )}
+                {isSyncing ? "Synker…" : lastSyncLabel}
+              </button>
+            ) : (
+              <a
+                href="/api/strava/auth"
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: STRAVA_ORANGE }}
+              >
+                <StravaIcon />
+                Koble til Strava
+              </a>
             )}
           </div>
-        </>
-      )}
-    </div>
+        </div>
+
+        {/* Sync message */}
+        {syncMessage && (
+          <div className="mb-4 px-4 py-3 rounded-xl bg-orange-50 border border-orange-200 text-sm text-orange-800 font-medium">
+            {syncMessage}
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-[#EBEBEA] rounded-xl p-1">
+          {(["oversikt", "aktiviteter", "statistikk"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 text-xs font-semibold py-2 rounded-lg capitalize transition-colors ${
+                activeTab === tab
+                  ? "bg-white text-[#111110] shadow-sm"
+                  : "text-[#6B6B65] hover:text-[#111110]"
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* ── OVERSIKT TAB ── */}
+        {activeTab === "oversikt" && (
+          <div className="space-y-5">
+            {!isStravaConnected && (
+              <div className="rounded-2xl border border-dashed border-[rgba(252,82,0,0.35)] bg-orange-50 p-6 text-center">
+                <p className="text-sm font-semibold text-gray-700 mb-1">Koble til Strava</p>
+                <p className="text-xs text-gray-500 mb-4">Synkroniser løpene dine for å se statistikk og fremgang.</p>
+                <a
+                  href="/api/strava/auth"
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
+                  style={{ backgroundColor: STRAVA_ORANGE }}
+                >
+                  <StravaIcon />
+                  Koble til Strava
+                </a>
+              </div>
+            )}
+
+            {isStravaConnected && !hasRuns && (
+              <EmptyRunsBanner
+                onSync={handleSync}
+                isSyncing={isSyncing}
+                athleteId={athlete?.id}
+              />
+            )}
+
+            {hasRuns && (
+              <>
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <WeeklyProgressBar runs={recentRuns} />
+                  <StatCard
+                    icon={<Activity size={13} className="text-[#FC5200]" />}
+                    label="Denne uken"
+                    value={`${Math.round(getWeeklyActualKm(recentRuns) * 10) / 10}`}
+                    unit="km"
+                    sub={`Mål: ${getWeeklyPlanKm()} km`}
+                  />
+                  <StatCard
+                    icon={<Timer size={13} className="text-[#FC5200]" />}
+                    label="Snittfart"
+                    value={avgPaceSecPerKm > 0 ? formatPace(avgPaceSecPerKm) : "—"}
+                    unit="/km"
+                    sub="Siste løp"
+                  />
+                  <StatCard
+                    icon={<TrendingUp size={13} className="text-[#FC5200]" />}
+                    label="Totalt i år"
+                    value={`${Math.round(computed.ytdKm)}`}
+                    unit="km"
+                    sub={`${computed.totalRunsAllTime} løp totalt`}
+                  />
+                  <StatCard
+                    icon={<Mountain size={13} className="text-[#FC5200]" />}
+                    label="Lengste løp"
+                    value={`${metersToKm(recentRuns.reduce((max, r) => Math.max(max, r.distance), 0))}`}
+                    unit="km"
+                    sub="Noensinne"
+                  />
+                </div>
+
+                {/* Ukentlig km-chart */}
+                {weeklyBuckets.length > 0 && (
+                  <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-bold text-[#111110]">Ukentlig km</h3>
+                      <span className="text-xs text-[#6B6B65]">Siste 8 uker</span>
+                    </div>
+                    <BarChart data={weeklyBuckets} />
+                  </div>
+                )}
+
+                {/* Ukensplan */}
+                <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-[#111110]">Ukensplan</h3>
+                    <Link
+                      href="/plan"
+                      className="text-xs text-[#FC5200] font-semibold flex items-center gap-0.5 hover:underline"
+                    >
+                      Se full plan <ChevronRight size={12} />
+                    </Link>
+                  </div>
+                  <div className="space-y-2">
+                    {planSessions.map((session, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-3 p-2.5 rounded-xl text-sm transition-colors ${
+                          session.done
+                            ? "bg-emerald-50 border border-emerald-100"
+                            : "bg-[#F8F8F7] border border-transparent"
+                        }`}
+                      >
+                        <span className="text-base">{session.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-xs truncate">{session.type}</span>
+                            {session.done && (
+                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                                ✓ Ferdig
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-[#6B6B65] truncate">
+                            {session.day} · {session.distance} · {session.pace}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* AI Coach quick link */}
+                <Link
+                  href="/coach"
+                  className="flex items-center justify-between p-4 bg-[#1C1C1A] text-white rounded-2xl hover:bg-[#2A2A28] transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[#FC5200] flex items-center justify-center shrink-0">
+                      <Brain size={16} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">AI Løpetrener</p>
+                      <p className="text-xs text-[#8A8A85]">Få personlig treningsrådgivning</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-[#6B6B65] group-hover:text-white transition-colors" />
+                </Link>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── AKTIVITETER TAB ── */}
+        {activeTab === "aktiviteter" && (
+          <div>
+            {!hasRuns ? (
+              <EmptyRunsBanner
+                onSync={handleSync}
+                isSyncing={isSyncing}
+                athleteId={athlete?.id}
+              />
+            ) : (
+              <>
+                {/* Aktivitetskalender — øverst */}
+                <ActivityCalendar runs={recentRuns} />
+
+                <div className="space-y-3">
+                  {recentRuns.slice(0, 20).map((run, i) => {
+                    const isExpanded = expandedActivity === i;
+                    const pace = activityPace(run);
+                    const km = metersToKm(run.distance);
+                    const duration = formatMovingTime(run.moving_time);
+                    const dateLabel = formatDate(run.start_date_local);
+                    const elevGain = run.total_elevation_gain ?? 0;
+                    const maxSpeed = run.max_speed ? mpsToKmh(run.max_speed) : null;
+                    const avgHr = run.average_heartrate ?? null;
+                    const maxHr = run.max_heartrate ?? null;
+
+                    return (
+                      <div
+                        key={run.id ?? i}
+                        className="bg-white border border-[#E5E5E2] rounded-2xl overflow-hidden hover:border-[#C8C8C4] transition-colors"
+                      >
+                        <button
+                          className="w-full text-left px-4 py-3.5 flex items-center gap-3"
+                          onClick={() => setExpandedActivity(isExpanded ? null : i)}
+                        >
+                          <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-white text-sm"
+                            style={{ backgroundColor: STRAVA_ORANGE }}
+                          >
+                            <Play size={14} fill="white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm truncate">
+                              {run.name ?? `Løpetur ${i + 1}`}
+                            </p>
+                            <p className="text-xs text-[#6B6B65]">
+                              {dateLabel} · {km} km · {duration}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold tabular-nums">{pace}</p>
+                            <p className="text-[10px] text-[#6B6B65]">/km</p>
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="px-4 pb-4 border-t border-[#F0F0EE] pt-3">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="text-center">
+                                <p className="text-[10px] text-[#9B9B95] mb-0.5">Distanse</p>
+                                <p className="text-sm font-bold">{km} km</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-[10px] text-[#9B9B95] mb-0.5">Tid</p>
+                                <p className="text-sm font-bold">{duration}</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-[10px] text-[#9B9B95] mb-0.5">Fart</p>
+                                <p className="text-sm font-bold">{pace}/km</p>
+                              </div>
+                              {elevGain > 0 && (
+                                <div className="text-center">
+                                  <p className="text-[10px] text-[#9B9B95] mb-0.5">Høydemeter</p>
+                                  <p className="text-sm font-bold">{Math.round(elevGain)} m</p>
+                                </div>
+                              )}
+                              {maxSpeed && (
+                                <div className="text-center">
+                                  <p className="text-[10px] text-[#9B9B95] mb-0.5">Topphastighet</p>
+                                  <p className="text-sm font-bold">{maxSpeed} km/t</p>
+                                </div>
+                              )}
+                              {avgHr && (
+                                <div className="text-center">
+                                  <p className="text-[10px] text-[#9B9B95] mb-0.5">Snitt-puls</p>
+                                  <p className="text-sm font-bold flex items-center justify-center gap-0.5">
+                                    <Heart size={11} className="text-red-400" />
+                                    {Math.round(avgHr)}
+                                  </p>
+                                </div>
+                              )}
+                              {maxHr && (
+                                <div className="text-center">
+                                  <p className="text-[10px] text-[#9B9B95] mb-0.5">Maks-puls</p>
+                                  <p className="text-sm font-bold flex items-center justify-center gap-0.5">
+                                    <Heart size={11} className="text-red-600" />
+                                    {Math.round(maxHr)}
+                                  </p>
+                                </div>
+                              )}
+
+                            </div>
+                            {run.id && (
+                              <a
+                                href={`https://www.strava.com/activities/${run.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#FC5200] hover:underline"
+                              >
+                                <StravaIcon />
+                                Se på Strava
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── STATISTIKK TAB ── */}
+        {activeTab === "statistikk" && (
+          <div className="space-y-5">
+            {!hasRuns ? (
+              <EmptyRunsBanner
+                onSync={handleSync}
+                isSyncing={isSyncing}
+                athleteId={athlete?.id}
+              />
+            ) : (
+              <>
+                {/* Personal bests */}
+                <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Trophy size={14} className="text-[#FC5200]" />
+                    <h3 className="text-sm font-bold text-[#111110]">Personlige rekorder</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      { label: "5 km", key: "fiveKm" as const },
+                      { label: "10 km", key: "tenKm" as const },
+                    ] as { label: string; key: keyof typeof personalBests }[]).map(({ label, key }) => {
+                      const pr = personalBests[key] as { time: number; date: string } | null;
+                      return (
+                        <div key={key} className="bg-[#F8F8F7] rounded-xl p-3">
+                          <p className="text-[10px] text-[#9B9B95] mb-1">{label}</p>
+                          {pr ? (
+                            <>
+                              <p className="text-sm font-bold tabular-nums">{formatPRTime(pr.time)}</p>
+                              <p className="text-[10px] text-[#6B6B65] mt-0.5">{formatDate(pr.date)}</p>
+                            </>
+                          ) : (
+                            <p className="text-sm font-semibold text-[#C8C8C4]">—</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div className="bg-[#F8F8F7] rounded-xl p-3">
+                      <p className="text-[10px] text-[#9B9B95] mb-1">Lengste løp</p>
+                      {personalBests.longestKm > 0 ? (
+                        <p className="text-sm font-bold tabular-nums">{personalBests.longestKm.toFixed(1)} km</p>
+                      ) : (
+                        <p className="text-sm font-semibold text-[#C8C8C4]">—</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pace trend */}
+                <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-[#111110]">Fartsutvikling</h3>
+                    <span className="text-xs text-[#6B6B65]">Siste 10 løp</span>
+                  </div>
+                  <PaceTrendChart runs={recentRuns} />
+                </div>
+
+                {/* Zone distribution */}
+                <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
+                  <ZoneDistributionChart runs={recentRuns} avgPaceSecPerKm={avgPaceSecPerKm} />
+                </div>
+
+                {/* All-time stats */}
+                <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
+                  <h3 className="text-sm font-bold text-[#111110] mb-4">Totaloversikt</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-[#F8F8F7] rounded-xl p-3">
+                      <p className="text-[10px] text-[#9B9B95] mb-1">Totale løp</p>
+                      <p className="text-lg font-black tabular-nums">{computed.totalRunsAllTime}</p>
+                    </div>
+                    <div className="bg-[#F8F8F7] rounded-xl p-3">
+                      <p className="text-[10px] text-[#9B9B95] mb-1">Total distanse</p>
+                      <p className="text-lg font-black tabular-nums">{Math.round(computed.totalKmAllTime)} <span className="text-xs font-medium text-[#6B6B65]">km</span></p>
+                    </div>
+                    <div className="bg-[#F8F8F7] rounded-xl p-3">
+                      <p className="text-[10px] text-[#9B9B95] mb-1">År til dato</p>
+                      <p className="text-lg font-black tabular-nums">{Math.round(computed.ytdKm)} <span className="text-xs font-medium text-[#6B6B65]">km</span></p>
+                    </div>
+                    <div className="bg-[#F8F8F7] rounded-xl p-3">
+                      <p className="text-[10px] text-[#9B9B95] mb-1">Lengste løp</p>
+                      <p className="text-lg font-black tabular-nums">{computed.longestRunKm.toFixed(1)} <span className="text-xs font-medium text-[#6B6B65]">km</span></p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
