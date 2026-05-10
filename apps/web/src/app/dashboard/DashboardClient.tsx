@@ -1047,11 +1047,13 @@ interface HMMonthPoint {
 }
 
 function buildHMMonthPoints(activities: StravaActivity[]): HMMonthPoint[] {
+  // Only threshold sessions: name must contain 'terskel' (case-insensitive)
   const qualifying = activities.filter(a => {
     if (a.type !== "Run" && a.sport_type !== "Run") return false;
-    if (a.distance < 5000 || a.moving_time <= 0) return false;
+    if (!(a.name ?? "").toLowerCase().includes("terskel")) return false;
+    if (a.distance < 3000 || a.moving_time <= 0) return false;
     const secPerKm = a.moving_time / (a.distance / 1000);
-    return secPerKm >= 210 && secPerKm <= 480; // 3:30–8:00 min/km
+    return secPerKm >= 180 && secPerKm <= 480; // 3:00–8:00 min/km
   });
   if (qualifying.length === 0) return [];
 
@@ -1433,16 +1435,6 @@ export default function DashboardClient({
               </div>
               <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
                 <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className="h-4 w-4 text-[#FC5200]" />
-                  <span className="text-xs text-[#6B6B65] font-medium">Snittfart</span>
-                </div>
-                <p className="text-2xl font-black text-[#111110] tabular-nums">
-                  {formatPace(computed.avgPaceSecPerKm)}
-                </p>
-                <p className="text-xs text-[#9B9B95] mt-0.5">min/km · siste løp</p>
-              </div>
-              <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
-                <div className="flex items-center gap-2 mb-1">
                   <Mountain className="h-4 w-4 text-[#FC5200]" />
                   <span className="text-xs text-[#6B6B65] font-medium">Lengste løp</span>
                 </div>
@@ -1451,17 +1443,6 @@ export default function DashboardClient({
                   <span className="text-sm font-medium text-[#6B6B65] ml-1">km</span>
                 </p>
                 <p className="text-xs text-[#9B9B95] mt-0.5">din lengste økt</p>
-              </div>
-              <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
-                <div className="flex items-center gap-2 mb-1">
-                  <Zap className="h-4 w-4 text-[#FC5200]" />
-                  <span className="text-xs text-[#6B6B65] font-medium">Totalt</span>
-                </div>
-                <p className="text-2xl font-black text-[#111110] tabular-nums">
-                  {Math.round(computed.totalKmAllTime)}
-                  <span className="text-sm font-medium text-[#6B6B65] ml-1">km</span>
-                </p>
-                <p className="text-xs text-[#9B9B95] mt-0.5">{computed.totalRunsAllTime} løp totalt</p>
               </div>
             </div>
 
