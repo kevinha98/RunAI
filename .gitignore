@@ -12,3 +12,6 @@ dist
 apps/web/data/
 
 autonomous/
+
+# TypeScript incremental build info
+*.tsbuildinfo
