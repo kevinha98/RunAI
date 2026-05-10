@@ -100,7 +100,7 @@ export default function CoachPage() {
         </div>
         <div>
           <h1 className="text-lg font-semibold text-white">AI Løpecoach</h1>
-          <p className="text-xs text-gray-400">Bergen City Marathon 2027</p>
+          <p className="text-xs text-gray-400">Bergen City Halvmaraton 2027</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-400 inline-block"></span>

@@ -40,7 +40,7 @@ export default function PlanPageClient({ initialOverrides, currentWeek }: Props)
           Treningsplan
         </h1>
         <p className="text-sm text-[#6B6B65] mt-1">
-          Bergen City Marathon &mdash; 24. april 2027 &middot; 52 uker
+          Bergen City Halvmaraton &mdash; 24. april 2027 &middot; 52 uker
         </p>
       </div>
 

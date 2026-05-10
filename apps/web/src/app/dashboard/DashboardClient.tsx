@@ -944,10 +944,10 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
 
 // ── Målpace-konstanter og hjelpefunksjoner ──────────────────────────────────
 
-/** Target pace for sub-3:30 Bergen City Marathon: 5:00/km = 300 sek/km */
-const TARGET_PACE_SEC_PER_KM = 300;
-const TARGET_PACE_LABEL = "5:00/km";
-const TARGET_RACE_LABEL = "Sub-3:30 Bergen City Marathon";
+/** Target pace for sub-2:00 Bergen City Halvmaraton: 5:41/km = 341 sek/km */
+const TARGET_PACE_SEC_PER_KM = 341;
+const TARGET_PACE_LABEL = "5:41/km";
+const TARGET_RACE_LABEL = "Sub-2:00 Bergen City Halvmaraton";
 /** Max antall sekunder bak mål som fortsatt gir >0% progress */
 const MAX_DELTA_SEC = 60;
 
@@ -1259,7 +1259,7 @@ function HalfMarathonTrendCard({ activities }: { activities: StravaActivity[] })
         )}
       </svg>
       <p className="text-[9px] text-[#9B9B95] mt-0.5 leading-tight">
-        Beste Cameron-estimat per måned · Stiplet linje = trend mot Bergen City Marathon apr 2027
+        Beste Cameron-estimat per måned · Stiplet linje = trend mot Bergen City Halvmaraton apr 2027
       </p>
     </div>
   );
@@ -1349,7 +1349,7 @@ export default function DashboardClient({
               {athlete?.firstname ? `Hei, ${athlete.firstname}! 👋` : "Dashboard"}
             </h1>
             <p className="text-sm text-[#6B6B65] mt-0.5">
-              Bergen City Marathon · {RACE_DATE}
+              Bergen City Halvmaraton · {RACE_DATE}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1371,7 +1371,7 @@ export default function DashboardClient({
               <span className="text-lg">🏁</span>
               <div>
                 <p className="text-[10px] text-[#6B6B65] font-medium uppercase tracking-wide">
-                  Bergen City Marathon
+                  Bergen City Halvmaraton
                 </p>
                 <p className="text-xl font-black text-[#111110] tabular-nums">
                   {marathonProgress.daysLeft}

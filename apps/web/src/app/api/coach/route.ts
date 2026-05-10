@@ -177,7 +177,7 @@ function executeTool(
 
     return (
       `Gjeldende planuke: ${currentWeek}/${TOTAL_WEEKS}\n` +
-      `Dager til Bergen City Marathon (${raceDateFormatted}): ${daysUntilRace}\n` +
+      `Dager til Bergen City Halvmaraton (${raceDateFormatted}): ${daysUntilRace}\n` +
       (taperNote ? `${taperNote}\n` : "") +
       `\n${planText}` +
       upcomingNote
@@ -287,7 +287,7 @@ function buildRunningHistoryContext(stats: StoredStats): string {
     `Gjeldende planuke: ${currentWeekNum}/${TOTAL_WEEKS} — Fase: ${phase}`,
     `Planlagt km denne uken: ${planWeekKm} km`,
     `Faktiske løp siste 7 dager: ${runCountLast7Days} løp — ${kmLast7Days.toFixed(1)} km totalt`,
-    `Dager til Bergen City Marathon: ${daysUntilRace}`,
+    `Dager til Bergen City Halvmaraton: ${daysUntilRace}`,
   ];
 
   if (runsLast7Days.length > 0) {

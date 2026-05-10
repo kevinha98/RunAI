@@ -41,7 +41,7 @@ export default async function PlanPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Treningsplan</h1>
         <p className="text-gray-500 mt-1 text-sm">
-          Bergen City Marathon · 24. april 2027
+          Bergen City Halvmaraton · 24. april 2027
         </p>
       </div>
       <PlanClient

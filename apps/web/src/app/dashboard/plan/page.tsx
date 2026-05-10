@@ -28,7 +28,7 @@ export default async function PlanPage() {
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-1">Treningsplan</h1>
           <p className="text-sm text-[#6B6B65] mb-6">
-            Bergen City Marathon &mdash; 24. april 2027 &middot; {WEEKS.length} uker &middot; Start 5. mai 2026
+            Bergen City Halvmaraton &mdash; 24. april 2027 &middot; {WEEKS.length} uker &middot; Start 5. mai 2026
           </p>
           <p className="text-xs text-[#9B9B95] mb-4">
             Klikk på en uke for å se alle enkeltøktene (mandag–søndag).

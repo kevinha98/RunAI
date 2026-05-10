@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
     const todayFormatted = today.toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     const weekSundayISO = new Date(new Date(weekDate).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const systemPrompt = `Du er en erfaren maratontrener som hjelper en løper mot Bergen City Marathon 24. april 2027.
+    const systemPrompt = `Du er en erfaren halvmaratontrener som hjelper en løper mot Bergen City Halvmaraton 24. april 2027.
 
 DAGENS DATO: ${todayFormatted} (${todayISO})
 GJELDENDE PLANUKE: Uke ${currentWeek}/${TOTAL_WEEKS}
@@ -172,7 +172,7 @@ Din oppgave er å:
 2. Gi konkrete, handlingsrettede råd
 3. Foreslå justeringer til kommende ukes plan hvis nødvendig
 4. Være ærlig og direkte — si klart fra om løperen trenger mer restitusjon eller bør øke belastningen
-5. Relatere fremgang til tid igjen til løpet (Bergen City Marathon 24. april 2027)
+5. Relatere fremgang til tid igjen til løpet (Bergen City Halvmaraton 24. april 2027)
 
 Svar på norsk. Bruk strukturert markdown (overskrifter, punktlister). Inkluder alltid dato-referanser i analysen.
 

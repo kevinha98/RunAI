@@ -105,7 +105,7 @@ export default function SettingsClient({ user, stravaConnected, stravaAthlete }:
       </Section>
 
       <Section title="Treningsplan">
-        <Row label="Løp" value="Bergen City Marathon" />
+        <Row label="Løp" value="Bergen City Halvmaraton" />
         <Row label="Dato" value={raceDateStr} />
         <Row label="Dager igjen" value={`${daysLeft} dager`} />
         <Row label="Planstart" value={planStartStr} />
@@ -120,7 +120,7 @@ export default function SettingsClient({ user, stravaConnected, stravaAthlete }:
       </Section>
 
       <div className="bg-[#F0F0EE] rounded-xl px-4 py-3 text-[10px] text-[#9B9B95] text-center">
-        RunAI v0.1 — Bergen City Marathon 24. april 2027
+        RunAI v0.1 — Bergen City Halvmaraton 24. april 2027
       </div>
     </div>
   );

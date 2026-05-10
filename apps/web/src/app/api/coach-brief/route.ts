@@ -94,7 +94,7 @@ REGLER:
 - Skriv direkte til Hilde ("du har", "du løp")
 - Varm og motiverende tone, men realistisk
 - Ingen emojis
-- Ikke gjenta "Bergen City Marathon" i hver setning`;
+- Ikke gjenta "Bergen City Halvmaraton" i hver setning`;
 
     const userMessage = `DAGENS DATO: ${today}
 GJELDENDE PLANUKE: ${currentWeek} — ${weekData?.phase ?? "ukjent"}
