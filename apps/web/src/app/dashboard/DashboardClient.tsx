@@ -783,6 +783,19 @@ const ICON_FOR_TYPE: Record<ActivityType, string> = {
   "Styrke": "💪", "Rolig jogg": "🏃", "Terskel": "⚡",
   "Intervall": "🔥", "Langtur": "🛣️", "Hvile": "😴",
 };
+/** Colored icon chip background per session type */
+const TYPE_CHIP_CLASS: Record<string, string> = {
+  "Rolig jogg": "bg-blue-50",
+  "Terskel":    "bg-orange-100",
+  "Intervall":  "bg-red-100",
+  "Langtur":    "bg-emerald-50",
+  "Styrke":     "bg-purple-50",
+  "Hvile":      "bg-[#F0F0EE]",
+};
+/** Whether a session type is a quality (hard) session */
+const isQualityType = (t: string) => t === "Terskel" || t === "Intervall";
+/** Whether the pace string is a non-running description (not a /km pace) */
+const isNonRunPace = (p: string) => !p.includes("/km");
 function iconForType(t: string): string {
   return ICON_FOR_TYPE[t as ActivityType] ?? "🏃";
 }
@@ -2093,28 +2106,53 @@ export default function DashboardClient({
                       }`}
                     >
                       {/* Main row */}
-                      <div className="flex items-center gap-3 px-3 py-2.5">
-                        <span className="text-lg leading-none shrink-0">{session.icon}</span>
+                      <div className="flex items-center gap-3 px-3 py-3">
+                        {/* Colored icon chip */}
+                        <div className={`w-10 h-10 flex items-center justify-center rounded-xl text-xl shrink-0 ${
+                          session.completed
+                            ? "bg-emerald-100"
+                            : (TYPE_CHIP_CLASS[session.type] ?? "bg-[#F0F0EE]")
+                        }`}>
+                          {session.icon}
+                        </div>
+
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            {session.completed && (
-                              <span className="text-xs font-bold text-emerald-700">
-                                {session.completedDay ?? session.day}
-                              </span>
-                            )}
-                            <span className={`text-xs font-semibold truncate ${session.completed ? "text-emerald-600 line-through" : "text-[#111110]"}`}>
+                          {/* Row 1: day + type name */}
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                              session.completed
+                                ? "bg-emerald-200 text-emerald-800"
+                                : "bg-[#E5E5E2] text-[#6B6B65]"
+                            }`}>
+                              {session.completed ? (session.completedDay ?? session.day) : session.day}
+                            </span>
+                            <span className={`text-xs font-bold truncate ${session.completed ? "text-emerald-600 line-through" : "text-[#111110]"}`}>
                               {session.type}
                             </span>
-                            {getIntervalLabel(session.type, session.distance) && (
-                              <span className="text-[10px] font-medium text-[#FC5200] bg-orange-50 px-1.5 py-0.5 rounded-full shrink-0">
-                                {getIntervalLabel(session.type, session.distance)}
+                          </div>
+                          {/* Row 2: interval/distance + pace */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {session.type !== "Hvile" && session.distance && session.distance !== "—" && (
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${
+                                session.completed
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : isQualityType(session.type)
+                                    ? "bg-orange-100 text-[#E04A00]"
+                                    : "bg-white text-[#444442] border border-[#E5E5E2]"
+                              }`}>
+                                {session.distance}
                               </span>
                             )}
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {session.distance && <span className="text-[10px] text-[#9B9B95]">{session.distance}</span>}
-                            {session.distance && session.pace && <span className="text-[10px] text-[#9B9B95]">·</span>}
-                            {session.pace && <span className="text-[10px] text-[#9B9B95]">{session.pace}</span>}
+                            {session.pace && !isNonRunPace(session.pace) && (
+                              <span className={`text-xs font-semibold ${
+                                session.completed ? "text-emerald-600" : isQualityType(session.type) ? "text-[#FC5200]" : "text-[#6B6B65]"
+                              }`}>
+                                {session.pace}
+                              </span>
+                            )}
+                            {session.pace && isNonRunPace(session.pace) && session.type !== "Hvile" && (
+                              <span className="text-[10px] text-[#9B9B95]">{session.pace}</span>
+                            )}
                           </div>
                         </div>
                         {/* Action buttons */}
