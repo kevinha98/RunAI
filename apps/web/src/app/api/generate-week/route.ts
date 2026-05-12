@@ -161,21 +161,25 @@ Rolig jogg (mål: restitusjon, RPE 3–4):
   - Lett (lavere RPE enn ventet): +1–2 km neste gang
   - Riktig (RPE som forventet): behold, evt. små justeringer
   - Hard (høyere RPE enn ventet): senk fart / kort ned distansen
+  - Trend over tid: juster fart gradvis
 
 Langtur (mål: aerob kapasitet, RPE 3–5):
   - Lett: +1–2 km neste gang
   - Riktig: behold, evt. små justeringer
-  - Hard: −20% lengde
+  - Hard: −20% lengde + roligere tempo
+  - Trend over tid: juster fart gradvis
 
 Terskelløkt (mål: øke fart, RPE 6–7):
   - Lett: øk volum (flere drag / lenger drag) → deretter øk fart
-  - Riktig: behold
+  - Riktig: behold, evt. små justeringer
   - Hard: senk fart eller reduser volum
+  - Trend over tid: juster fart gradvis
 
 Intervall 1000m (mål: VO2 maks, RPE 8–9):
   - Lett: +1 drag ELLER −5 sek/km
-  - Riktig: behold
-  - Hard: færre drag / mer pause
+  - Riktig: behold, evt. små justeringer
+  - Hard: færre drag / mer pause / roligere
+  - Trend over tid: juster fart gradvis
 
 REGEL 3 — STRUKTUR:
 - Øk aldri langtur og terskel/intervall samme uke
