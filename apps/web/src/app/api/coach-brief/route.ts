@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import { getUserCheckins } from "@/lib/db/checkins";
 import { WEEKS, getCurrentWeek } from "@/lib/plan-data";
+import { getWeekSessions } from "@/lib/db/weekly-sessions";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
@@ -48,6 +49,12 @@ export async function GET() {
     const weekData = WEEKS[currentWeek - 1];
     const nextWeekData = WEEKS[currentWeek] ?? null;
 
+    // Fetch this week's and last week's manual session data
+    const [thisWeekSessions, lastWeekSessions] = await Promise.all([
+      getWeekSessions(userId, currentWeek),
+      getWeekSessions(userId, currentWeek - 1),
+    ]);
+
     // Build last 7 days activity summary
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const recentRuns = (stats.recentActivities ?? []).filter(
@@ -75,6 +82,28 @@ export async function GET() {
       ? `SISTE UKERAPPORT (${latestCheckin.weekNumber ?? "uke "}, innlevert ${new Date(latestCheckin.createdAt).toLocaleDateString("nb-NO")}):\n${latestCheckin.llmAnalysis ?? latestCheckin.userReport ?? "Ingen rapport."}`
       : "Ingen ukerapport tilgjengelig.";
 
+    // Build session comments context
+    const buildSessionSummary = (sessions: typeof thisWeekSessions) => {
+      if (!sessions?.sessions?.length) return null;
+      const completed = sessions.sessions.filter((s) => s.completed);
+      const missed = sessions.sessions.filter((s) => !s.completed);
+      const lines: string[] = [];
+      if (completed.length) {
+        lines.push("Gjennomført:");
+        completed.forEach((s) => {
+          const comment = s.comment?.trim() ? ` — "${s.comment}"` : "";
+          lines.push(`  • ${s.completedDay ?? s.day}: ${s.type} ${s.distance ?? ""}${s.pace ? ` @ ${s.pace}` : ""}${comment}`);
+        });
+      }
+      if (missed.length) {
+        lines.push(`Ikke gjennomført: ${missed.map((s) => `${s.day} ${s.type}`).join(", ")}`);
+      }
+      return lines.join("\n");
+    };
+
+    const thisWeekSummary = buildSessionSummary(thisWeekSessions);
+    const lastWeekSummary = buildSessionSummary(lastWeekSessions);
+
     // Next week plan
     const nextWeekText = nextWeekData
       ? `Neste uke (uke ${currentWeek + 1}): ${nextWeekData.phase} — mål ${nextWeekData.totalKm} km (${nextWeekData.sessions.map((s) => `${s.type} ${s.distance ?? ""}`).join(", ")})`
@@ -88,8 +117,8 @@ export async function GET() {
 
 REGLER:
 - Maks 3 korte avsnitt, ingen markdown-overskrifter
-- Avsnitt 1: Hva Hilde har gjort siste uke (bruk faktiske tall fra Strava)
-- Avsnitt 2: Hvordan Hilde selv har beskrevet innsats og feeling i siste ukerapport (med dato)
+- Avsnitt 1: Hva Hilde har gjort siste uke (bruk faktiske tall fra Strava og øktkommentarer)
+- Avsnitt 2: Hvordan Hilde selv har beskrevet innsats og feeling — bruk øktkommentarer og ukerapport
 - Avsnitt 3: Hva som er planen fremover denne uken og neste uke
 - Skriv direkte til Hilde ("du har", "du løp")
 - Varm og motiverende tone, men realistisk
@@ -101,6 +130,8 @@ GJELDENDE PLANUKE: ${currentWeek} — ${weekData?.phase ?? "ukjent"}
 
 STRAVA SISTE 7 DAGER (${recentRuns.length} løpeturer, totalt ${totalKmWeek.toFixed(1)} km):
 ${activityLines}
+${lastWeekSummary ? `\nFORRIGE UKES ØKTER (uke ${currentWeek - 1}):\n${lastWeekSummary}` : ""}
+${thisWeekSummary ? `\nDENNE UKENS ØKTER SÅ LANGT (uke ${currentWeek}):\n${thisWeekSummary}` : ""}
 
 ${checkinText}
 
