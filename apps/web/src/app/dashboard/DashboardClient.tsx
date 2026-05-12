@@ -20,6 +20,8 @@ import {
   Trash2,
   Plus,
   Check,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { StoredStats, StravaActivity } from "@/lib/strava-types";
 import { formatPace, computePaceZoneDistribution, computePersonalBests } from "@/lib/strava-types";
@@ -1504,6 +1506,7 @@ export default function DashboardClient({
   // Generate next week
   const [generatingNextWeek, setGeneratingNextWeek] = useState(false);
   const [generateNote, setGenerateNote] = useState<string | null>(null);
+  const [showCoachRules, setShowCoachRules] = useState(false);
 
   const navigateWeek = (delta: number) => {
     const next = Math.max(1, Math.min(TOTAL_WEEKS, viewingWeek + delta));
@@ -2347,6 +2350,65 @@ export default function DashboardClient({
                       <p className="text-xs text-emerald-700 italic">&ldquo;{generateNote}&rdquo;</p>
                     </div>
                   )}
+
+                  {/* Collapsible coach rules */}
+                  <div className="mb-3 border border-[#E5E5E2] rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setShowCoachRules((v) => !v)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-[#6B6B65] hover:bg-[#F5F5F3] transition-colors"
+                    >
+                      <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-[#FC5200]" />AI-coachens justeringsregler</span>
+                      {showCoachRules ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+                    {showCoachRules && (
+                      <div className="border-t border-[#E5E5E2] px-3 py-3 bg-[#FAFAF9] text-[10px] text-[#6B6B65] space-y-2">
+                        <table className="w-full text-[10px]">
+                          <thead>
+                            <tr className="text-[#9B9B95]">
+                              <th className="text-left font-semibold pb-1 pr-2">Økt</th>
+                              <th className="text-left font-semibold pb-1 pr-2">RPE</th>
+                              <th className="text-left font-semibold pb-1 pr-2">Lett</th>
+                              <th className="text-left font-semibold pb-1 pr-2">Riktig</th>
+                              <th className="text-left font-semibold pb-1">Hard</th>
+                            </tr>
+                          </thead>
+                          <tbody className="[&>tr>td]:py-1 [&>tr>td]:pr-2 [&>tr]:border-t [&>tr]:border-[#F0F0EE]">
+                            <tr>
+                              <td className="font-semibold text-[#111110]">Rolig jogg</td>
+                              <td className="text-[#9B9B95]">3–4</td>
+                              <td>+1–2 km</td>
+                              <td>Behold</td>
+                              <td>Senk fart / kort ned</td>
+                            </tr>
+                            <tr>
+                              <td className="font-semibold text-[#111110]">Langtur</td>
+                              <td className="text-[#9B9B95]">3–5</td>
+                              <td>+1–2 km</td>
+                              <td>Behold</td>
+                              <td>−20 % lengde + roligere</td>
+                            </tr>
+                            <tr>
+                              <td className="font-semibold text-[#111110]">Terskel</td>
+                              <td className="text-[#9B9B95]">6–7</td>
+                              <td>Øk volum → fart</td>
+                              <td>Behold</td>
+                              <td>Senk fart/volum</td>
+                            </tr>
+                            <tr>
+                              <td className="font-semibold text-[#111110]">Intervall</td>
+                              <td className="text-[#9B9B95]">8–9</td>
+                              <td>+1 drag / −5 sek</td>
+                              <td>Behold</td>
+                              <td>Færre drag / mer pause</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <p className="pt-1 border-t border-[#F0F0EE]">
+                          <strong className="text-[#111110]">Terskelregel:</strong> Jevn fart på alle drag <em>og</em> kunne tatt ett drag til → øk volum <em>eller</em> −5 sek/km.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={handleGenerateNextWeek}
                     disabled={generatingNextWeek}
