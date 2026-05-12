@@ -6,6 +6,8 @@ import { formatPace } from "@/lib/strava-types";
 import { createClient } from "@/lib/supabase/server";
 import { WEEKS, getCurrentWeek, RACE_DATE, TOTAL_WEEKS } from "@/lib/plan-data";
 import { buildProfileBlock } from "@/lib/db/athlete-profile";
+import { getUserCheckins } from "@/lib/db/checkins";
+import type { WeeklyCheckin } from "@/lib/db/checkins";
 import type { StoredStats } from "@/lib/strava-types";
 
 // Allow up to 60 s for the agentic tool loop on Vercel
@@ -60,14 +62,45 @@ const COACH_TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "get_checkin_history",
+    description:
+      "Henter Hildes ukerapporter og treneranalyser. Bruk dette når brukeren spør om utvikling over tid, tidligere uker, skadeshistorikk, mønstre i treningen, tretthet over tid, eller hva hun rapporterte tidligere. Uunnværlig for trendanalyse.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        limit: {
+          type: "number",
+          description: "Antall ukerapporter å hente (nyeste først). Standard: 10, maks 20.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ─── Tool executor ────────────────────────────────────────────────────────────
 function executeTool(
   name: string,
   input: Record<string, unknown>,
-  stats: StoredStats
+  stats: StoredStats,
+  checkins: WeeklyCheckin[] = []
 ): string {
+  if (name === "get_checkin_history") {
+    if (checkins.length === 0) return "Ingen ukerapporter er registrert ennå.";
+    const limit = Math.min(20, Math.max(1, (input.limit as number) ?? 10));
+    return checkins
+      .slice()
+      .reverse()
+      .slice(0, limit)
+      .map(
+        (c) =>
+          `Uke ${c.weekNumber} (${c.weekDate}):\nHildes rapport: ${c.userReport}\nTreneranalyse: ${c.llmAnalysis.slice(0, 600)}${c.llmAnalysis.length > 600 ? "…" : ""}${
+            c.adjustments?.length ? `\nJusteringer: ${c.adjustments.length} stk` : ""
+          }`
+      )
+      .join("\n\n---\n\n");
+  }
   if (name === "get_full_activity_history") {
     const type = (input.activity_type as string) ?? "all";
     const activities =
@@ -380,6 +413,7 @@ ${runningHistoryCtx}
 <available_tools>
 - get_full_activity_history: Hent full aktivitetslogg (opp til 50 aktiviteter) for dypere analyse
 - get_training_plan: Hent ukesplanen (gjeldende uke + 3 neste som standard, spesifikk uke, eller week: -1 for neste 3 uker). Bruk proaktivt når brukeren spør om kommende trening, ukesplan eller treningsbelastning.
+- get_checkin_history: Hent Hildes ukerapporter og treneranalyser (siste 10 som standard). Bruk når du trenger trenddata, skadeshistorikk, eller hva hun rapporterte om tidligere uker.
 </available_tools>
 
 <coaching_philosophy>
@@ -415,27 +449,19 @@ export async function POST(req: NextRequest) {
       resolvedUserId = user?.id ?? null;
     }
 
-    // Load stats (falls back to empty stats if no userId)
-    const [stats, profileBlock]: [StoredStats, string] = await Promise.all([
-      resolvedUserId
-        ? readUserStats(resolvedUserId)
-        : Promise.resolve({
-            athlete: null,
-            computed: {
-              weeklyKm: 0,
-              weeklyRuns: 0,
-              avgPaceSecPerKm: 0,
-              longestRunKm: 0,
-              totalRunsAllTime: 0,
-              totalKmAllTime: 0,
-              ytdKm: 0,
-            },
-            recentRuns: [],
-            recentActivities: [],
-            stravaStats: null,
-            lastSync: "",
-          }),
+    // Load stats, profile and checkin history in parallel
+    const emptyStats: StoredStats = {
+      athlete: null,
+      computed: { weeklyKm: 0, weeklyRuns: 0, avgPaceSecPerKm: 0, longestRunKm: 0, totalRunsAllTime: 0, totalKmAllTime: 0, ytdKm: 0 },
+      recentRuns: [],
+      recentActivities: [],
+      stravaStats: null,
+      lastSync: "",
+    };
+    const [stats, profileBlock, checkins]: [StoredStats, string, WeeklyCheckin[]] = await Promise.all([
+      resolvedUserId ? readUserStats(resolvedUserId) : Promise.resolve(emptyStats),
       resolvedUserId ? buildProfileBlock(resolvedUserId) : Promise.resolve(""),
+      resolvedUserId ? getUserCheckins(resolvedUserId, 20) : Promise.resolve([]),
     ]);
 
     // Context window management: keep last N messages, always end on a user message
@@ -487,7 +513,7 @@ export async function POST(req: NextRequest) {
         toolUseBlocks.map(async (block) => ({
           type: "tool_result" as const,
           tool_use_id: block.id,
-          content: executeTool(block.name, block.input as Record<string, unknown>, stats),
+          content: executeTool(block.name, block.input as Record<string, unknown>, stats, checkins),
         }))
       );
 

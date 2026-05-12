@@ -15,6 +15,9 @@ import { MODELS } from "@/lib/llm";
 import { createClient } from "@/lib/supabase/server";
 import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import { buildProfileBlock } from "@/lib/db/athlete-profile";
+import { getUserCheckins } from "@/lib/db/checkins";
+import { readUserStats } from "@/lib/stats-store";
+import { formatPace } from "@/lib/strava-types";
 import type { SessionEntry } from "@/lib/db/weekly-sessions";
 
 export const maxDuration = 45;
@@ -71,7 +74,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing message or sessions" }, { status: 400 });
     }
 
-    const profileBlock = await buildProfileBlock(userId);
+    const [profileBlock, stats, checkins] = await Promise.all([
+      buildProfileBlock(userId),
+      readUserStats(userId),
+      getUserCheckins(userId, 5),
+    ]);
+
+    // Build recent Strava runs block
+    const recentRuns = (stats.recentActivities ?? [])
+      .filter((a) => a.type === "Run")
+      .slice(0, 7)
+      .map((a) => {
+        const km = (a.distance / 1000).toFixed(1);
+        const pace = formatPace(a.moving_time / (a.distance / 1000));
+        const date = new Date(a.start_date_local).toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+        const hr = a.average_heartrate ? ` | puls ${Math.round(a.average_heartrate)}` : "";
+        return `• ${date}: ${km} km @ ${pace}/km${hr}`;
+      })
+      .join("\n");
+    const stravaBlock = recentRuns ? `\nSiste løpeturer (Strava):\n${recentRuns}` : "";
+
+    // Build recent checkin history block
+    const checkinBlock =
+      checkins.length === 0
+        ? ""
+        : `\nTidligere ukerapporter (siste ${checkins.length}):${
+            checkins
+              .slice()
+              .reverse()
+              .map((c) => `\nUke ${c.weekNumber}: ${c.userReport.slice(0, 120)}${c.userReport.length > 120 ? "…" : ""}`)
+              .join("")
+          }`;
 
     // Format current sessions for LLM
     const sessionsText = sessions
@@ -89,7 +122,8 @@ export async function POST(req: NextRequest) {
         : "";
 
     const systemPrompt = `Du er Hildes personlige løpecoach. Du hjelper henne med å justere ukeøktene via chat.
-${profileBlock ? "\n" + profileBlock + "\n" : ""}
+${profileBlock ? "\n" + profileBlock + "\n" : ""}${stravaBlock}${checkinBlock}
+
 GJELDENDE UKEPLAN — Uke ${weekNumber}:
 ${sessionsText}
 ${p5kBlock}

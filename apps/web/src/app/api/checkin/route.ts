@@ -174,13 +174,29 @@ export async function POST(req: NextRequest) {
       weekDate = planWeekMonday(currentWeek);
     }
 
-    // Load user's Strava data, training plan context, and athlete profile
-    const [stats, profileBlock] = await Promise.all([
+    // Load user's Strava data, training plan context, athlete profile, and previous checkins
+    const [stats, profileBlock, previousCheckins] = await Promise.all([
       readUserStats(userId),
       buildProfileBlock(userId),
+      getUserCheckins(userId, 5),
     ]);
     const activitySummary = buildActivitySummary(stats);
     const planWeekText = buildPlanWeekText(currentWeek);
+
+    // Build previous weeks trend block
+    const prevBlock =
+      previousCheckins.length === 0
+        ? ""
+        : `\n## SISTE ${previousCheckins.length} UKERAPPORTER (kronologisk — bruk til trendanalyse):\n` +
+          previousCheckins
+            .slice()
+            .reverse()
+            .map(
+              (c) =>
+                `Uke ${c.weekNumber} (${c.weekDate}): ${c.userReport.slice(0, 200)}${c.userReport.length > 200 ? "…" : ""}`
+            )
+            .join("\n") +
+          "\n";
 
     // Date context for LLM
     const today = new Date();
@@ -189,7 +205,7 @@ export async function POST(req: NextRequest) {
     const weekSundayISO = new Date(new Date(weekDate).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const systemPrompt = `Du er en erfaren halvmaratontrener som hjelper en løper mot Bergen City Halvmaraton 24. april 2027.
-${profileBlock ? "\n" + profileBlock + "\n" : ""}
+${profileBlock ? "\n" + profileBlock + "\n" : ""}${prevBlock}
 
 DAGENS DATO: ${todayFormatted} (${todayISO})
 GJELDENDE PLANUKE: Uke ${currentWeek}/${TOTAL_WEEKS}
