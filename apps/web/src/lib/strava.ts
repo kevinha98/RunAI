@@ -273,7 +273,7 @@ export function buildAuthUrl(redirectUri: string): string {
     client_id: process.env.STRAVA_CLIENT_ID ?? "",
     redirect_uri: redirectUri,
     response_type: "code",
-    approval_prompt: "auto",
+    approval_prompt: "force",
     scope: "read,activity:read_all",
   });
   return `https://www.strava.com/oauth/authorize?${params.toString()}`;
