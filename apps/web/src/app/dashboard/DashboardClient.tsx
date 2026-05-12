@@ -28,6 +28,33 @@ import type { Phase, Week } from "@/lib/plan-data";
 import { cameronPredict, DIST, formatTime } from "@/lib/race-predictor";
 
 const STRAVA_ORANGE = "#FC5200";
+
+// ── Info popup ──────────────────────────────────────────────────────────────
+function InfoPopup({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-flex">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-4 h-4 rounded-full border border-[#C8C8C4] text-[#9B9B95] hover:border-[#FC5200] hover:text-[#FC5200] transition-colors flex items-center justify-center text-[9px] font-bold leading-none"
+        aria-label="Info"
+      >
+        i
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-6 top-0 z-50 w-64 bg-white border border-[#E5E5E2] rounded-xl shadow-lg p-3 text-xs text-[#3D3D38] leading-relaxed">
+            {children}
+            <button onClick={() => setOpen(false)} className="absolute top-2 right-2 text-[#C8C8C4] hover:text-[#6B6B65]">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 const RACE_DATE = "2027-04-24";
 
 // Map Norwegian day abbreviations to JS getDay() index (0=Sun)
@@ -1751,6 +1778,10 @@ export default function DashboardClient({
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-2 rounded-full bg-[#FC5200]" />
                 <span className="text-xs font-semibold text-[#FC5200] uppercase tracking-wide">Coachens situasjonsbilde</span>
+                <InfoPopup>
+                  <strong className="block mb-1">Coachens situasjonsbilde</strong>
+                  AI-coachen oppsummerer hva du har gjort siste uke basert på Strava-aktiviteter og øktkommentarer dine, og gir deg en pekepinn på hva som er planen fremover. Oppdateres automatisk én gang i timen.
+                </InfoPopup>
                 {coachBriefTs && (
                   <span className="ml-auto text-[10px] text-[#9B9B95]">
                     {new Date(coachBriefTs).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
@@ -1813,6 +1844,10 @@ export default function DashboardClient({
                   <div className="flex items-center gap-2">
                     <Timer className="h-4 w-4 text-[#FC5200]" />
                     <span className="text-sm font-bold text-[#111110]">Pace mot mål</span>
+                    <InfoPopup>
+                      <strong className="block mb-1">Pace mot mål</strong>
+                      Sammenligner gjennomsnittlig pace på dine siste løp med målfarten for Bergen City halvmaraton (5:41/km = sub 2:00). Viser om du er på vei i riktig retning.
+                    </InfoPopup>
                   </div>
                   <span
                     className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
@@ -1899,6 +1934,10 @@ export default function DashboardClient({
               <div className="flex items-center gap-2 mb-3">
                 <Trophy className="h-4 w-4 text-[#FC5200]" />
                 <h3 className="text-sm font-bold text-[#111110]">Personlige rekorder</h3>
+                <InfoPopup>
+                  <strong className="block mb-1">Personlige rekorder</strong>
+                  Beste tid på 5 km, 10 km og halvmaraton hentet fra Strava-aktivitetene dine. Oppdateres automatisk når du synkroniserer.
+                </InfoPopup>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="text-center">
@@ -1931,7 +1970,13 @@ export default function DashboardClient({
             {/* Weekly km chart */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-[#111110]">Ukentlig km</h3>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-sm font-bold text-[#111110]">Ukentlig km</h3>
+                  <InfoPopup>
+                    <strong className="block mb-1">Ukentlig km</strong>
+                    Viser hvor mange kilometer du løp per uke de siste 8 ukene, basert på Strava-data. Hjelper deg se om volumet øker gradvis over tid.
+                  </InfoPopup>
+                </div>
                 <span className="text-xs text-[#6B6B65]">Siste 8 uker</span>
               </div>
               {weeklyBuckets.length > 0 ? (
@@ -1985,7 +2030,14 @@ export default function DashboardClient({
                 </button>
               </div>
 
-              <div className="flex justify-end mb-3">
+              <div className="flex justify-end items-center gap-2 mb-3">
+                <InfoPopup>
+                  <strong className="block mb-1">Ukens økter</strong>
+                  <p className="mb-1">En liste over øktene du skal gjennom denne uken, hentet fra halvmaratonprogrammet.</p>
+                  <p className="mb-1"><strong>Huke av en økt:</strong> Trykk ✓-knappen → velg hvilken dag du gjennomførte → skriv en valgfri kommentar.</p>
+                  <p className="mb-1"><strong>Rediger:</strong> Trykk blyant-ikonet for å justere distanse, pace eller type.</p>
+                  <p><strong>Generer neste uke:</strong> AI-coachen leser kommentarene dine og lager en justert plan for neste uke basert på treningsprogrammet.</p>
+                </InfoPopup>
                 <button
                   onClick={resetToDefault}
                   className="text-[10px] text-[#9B9B95] hover:text-[#6B6B65] underline"
