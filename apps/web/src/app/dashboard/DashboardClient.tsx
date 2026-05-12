@@ -2006,8 +2006,8 @@ export default function DashboardClient({
               ) : (
               <div className="space-y-2">
                 {[
-                  ...weekSessions.filter((s) => s.completed).sort((a, b) => (DAY_IDX[a.completedDay ?? a.day] ?? 0) - (DAY_IDX[b.completedDay ?? b.day] ?? 0)),
-                  ...weekSessions.filter((s) => !s.completed),
+                  ...weekSessions.filter((s) => s.completed && s.type !== "Hvile").sort((a, b) => (DAY_IDX[a.completedDay ?? a.day] ?? 0) - (DAY_IDX[b.completedDay ?? b.day] ?? 0)),
+                  ...weekSessions.filter((s) => !s.completed && s.type !== "Hvile"),
                 ].map((session) => {
                   const isEditing = editingId === session.id;
                   const isConfirming = confirmingId === session.id;
@@ -2099,10 +2099,12 @@ export default function DashboardClient({
                         <span className="text-lg leading-none shrink-0">{session.icon}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className={`text-xs font-bold ${session.completed ? "text-emerald-700" : "text-[#111110]"}`}>
-                              {session.completed ? (session.completedDay ?? session.day) : session.day}
-                            </span>
-                            <span className={`text-xs truncate ${session.completed ? "text-emerald-600 line-through" : "text-[#6B6B65]"}`}>
+                            {session.completed && (
+                              <span className="text-xs font-bold text-emerald-700">
+                                {session.completedDay ?? session.day}
+                              </span>
+                            )}
+                            <span className={`text-xs font-semibold truncate ${session.completed ? "text-emerald-600 line-through" : "text-[#111110]"}`}>
                               {session.type}
                             </span>
                           </div>
