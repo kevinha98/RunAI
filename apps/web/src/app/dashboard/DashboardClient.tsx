@@ -26,35 +26,9 @@ import { formatPace, computePaceZoneDistribution, computePersonalBests } from "@
 import { getCurrentWeek, WEEKS, PLAN_START, RACE_DATE as RACE_DATE_OBJ, TOTAL_WEEKS } from "@/lib/plan-data";
 import type { Phase, Week } from "@/lib/plan-data";
 import { cameronPredict, DIST, formatTime } from "@/lib/race-predictor";
+import { InfoPopup, StorageBadge } from "@/components/InfoPopup";
 
 const STRAVA_ORANGE = "#FC5200";
-
-// ── Info popup ──────────────────────────────────────────────────────────────
-function InfoPopup({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative inline-flex">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-4 h-4 rounded-full border border-[#C8C8C4] text-[#9B9B95] hover:border-[#FC5200] hover:text-[#FC5200] transition-colors flex items-center justify-center text-[9px] font-bold leading-none"
-        aria-label="Info"
-      >
-        i
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-6 top-0 z-50 w-64 bg-white border border-[#E5E5E2] rounded-xl shadow-lg p-3 text-xs text-[#3D3D38] leading-relaxed">
-            {children}
-            <button onClick={() => setOpen(false)} className="absolute top-2 right-2 text-[#C8C8C4] hover:text-[#6B6B65]">
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 const RACE_DATE = "2027-04-24";
 
 // Map Norwegian day abbreviations to JS getDay() index (0=Sun)
@@ -2036,7 +2010,9 @@ export default function DashboardClient({
                   <p className="mb-1">En liste over øktene du skal gjennom denne uken, hentet fra halvmaratonprogrammet.</p>
                   <p className="mb-1"><strong>Huke av en økt:</strong> Trykk ✓-knappen → velg hvilken dag du gjennomførte → skriv en valgfri kommentar.</p>
                   <p className="mb-1"><strong>Rediger:</strong> Trykk blyant-ikonet for å justere distanse, pace eller type.</p>
-                  <p><strong>Generer neste uke:</strong> AI-coachen leser kommentarene dine og lager en justert plan for neste uke basert på treningsprogrammet.</p>
+                  <p className="mb-2"><strong>Generer neste uke:</strong> AI-coachen leser kommentarene dine og lager en justert plan for neste uke basert på treningsprogrammet.</p>
+                  <StorageBadge type="supabase" />
+                  <p className="mt-1 text-[10px] text-[#9B9B95]">Avhukinger, kommentarer og redigeringer lagres permanent i skyen. Nullstill uke fjerner lokale endringer og tilbakestiller til original plan.</p>
                 </InfoPopup>
                 <button
                   onClick={resetToDefault}

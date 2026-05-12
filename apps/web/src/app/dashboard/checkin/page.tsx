@@ -15,6 +15,7 @@ import {
   Trash2,
   Pencil,
 } from "lucide-react";
+import { InfoPopup, StorageBadge } from "@/components/InfoPopup";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -401,7 +402,16 @@ export default function CheckinPage() {
             <ClipboardList size={18} className="text-[#FC5200]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-[#111110]">Ukerapport</h1>
+            <h1 className="text-xl font-bold text-[#111110] flex items-center gap-2">
+              Ukerapport
+              <InfoPopup>
+                <strong className="block mb-1">Ukerapport</strong>
+                <p className="mb-1">Skriv fritt om uken — form, energinivå, skader, økter du fullførte og misset. AI-en analyserer og justerer planen din.</p>
+                <p className="mb-2">Historikken vises under og brukes av coachen når du ber om vurdering.</p>
+                <StorageBadge type="supabase" />
+                <p className="mt-1 text-[10px] text-[#9B9B95]">Rapporter lagres permanent i skyen og kan redigeres eller slettes fra historikk-listen nedenfor.</p>
+              </InfoPopup>
+            </h1>
             <p className="text-xs text-[#6B6B65] mt-0.5">
               Fortell treneren din hvordan uken gikk — AI-en analyserer og justerer neste ukes plan
             </p>

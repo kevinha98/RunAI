@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { ChevronDown, ChevronUp, Info, TrendingUp } from "lucide-react";
+import { InfoPopup, StorageBadge } from "@/components/InfoPopup";
 import {
   predict,
   formatTime,
@@ -84,7 +85,16 @@ export default function PredictClient() {
     <div className="space-y-6">
       {/* Input */}
       <div className="bg-white border border-[#E5E5E2] rounded-xl p-6">
-        <h2 className="text-base font-semibold text-[#111110] mb-1">Dine løpsresultater</h2>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-base font-semibold text-[#111110]">Dine løpsresultater</h2>
+          <InfoPopup>
+            <strong className="block mb-1">Tidsprediksjon</strong>
+            <p className="mb-1">Beregner estimert halvmaraton- og maratontid basert på dine løpsresultater, ved hjelp av Cameron- og Riegel-formlene.</p>
+            <p className="mb-2">Jo nærmere halvmaraton 5K-/10K-tidene dine er, jo mer nøyaktig er estimatet. Marathonestimatet er mer usikkert.</p>
+            <StorageBadge type="readonly" />
+            <p className="mt-1 text-[10px] text-[#9B9B95]">Ingen data lagres — beregningen skjer lokalt i nettleseren din.</p>
+          </InfoPopup>
+        </div>
         <p className="text-xs text-[#9B9B95] mb-5">Fyll inn én eller begge. Format: <code className="bg-[#F5F5F3] px-1 rounded">mm:ss</code> eller <code className="bg-[#F5F5F3] px-1 rounded">h:mm:ss</code></p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <TimeInput label="5K personlig beste" hint="F.eks. 22:14 (mm:ss)" value={fiveKStr} onChange={setFiveKStr} onValidChange={setFiveKValid} testId="input-5k" />

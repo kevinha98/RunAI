@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Zap, RotateCcw, Plus, Trash2, Pencil } from "lucide-react";
+import { InfoPopup, StorageBadge } from "@/components/InfoPopup";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -245,9 +246,17 @@ export default function StrengthClient() {
           <h1 className="text-2xl font-black tracking-tight flex items-center gap-2.5">
             <Zap size={22} className="text-[#FC5200]" />
             Styrketrening
+            <InfoPopup>
+              <strong className="block mb-1">Styrketrening</strong>
+              <p className="mb-1">Tilpassede styrkeøkter for løpere. Klikk på et felt (sett, reps, navn) for å redigere direkte.</p>
+              <p className="mb-1"><strong>Legg til øvelse:</strong> Trykk + nederst i en sesjon.</p>
+              <p className="mb-2"><strong>Slett øvelse:</strong> Trykk søppelbøtte-ikonet ved siden av øvelsen.</p>
+              <StorageBadge type="local" />
+              <p className="mt-1 text-[10px] text-[#9B9B95]">Endringer lagres kun i denne nettleseren. Hvis du tømmer nettleserdata eller bytter enhet, forsvinner endringene. Bruk «Tilbakestill» for å gå tilbake til standardprogrammet.</p>
+            </InfoPopup>
           </h1>
           <p className="text-[#6B6B65] text-sm mt-1">
-            Klikk på et felt for å redigere — endringer lagres automatisk
+            Klikk på et felt for å redigere — endringer lagres kun i nettleseren
           </p>
         </div>
         <button

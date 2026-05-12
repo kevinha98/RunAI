@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import type { StravaActivity } from "@/lib/strava-types";
+import { InfoPopup, StorageBadge } from "@/components/InfoPopup";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Fremgang" };
@@ -476,6 +477,12 @@ export default async function ProgressPage() {
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp size={20} className="text-[#FC5200]" />
             <h1 className="text-2xl font-black tracking-tight">Fremgang</h1>
+            <InfoPopup>
+              <strong className="block mb-1">Fremgang</strong>
+              <p className="mb-2">Viser løpsutviklingen din over tid basert på Strava-data: ukentlig km, gjennomsnittlig pace og enkeltaktiviteter.</p>
+              <StorageBadge type="readonly" />
+              <p className="mt-1 text-[10px] text-[#9B9B95]">Dataene leses fra Strava og kan ikke redigeres her. Synkroniser via sidemenyen for å hente siste løp.</p>
+            </InfoPopup>
           </div>
           <p className="text-sm text-[#6B6B65]">
             Løpeutvikling basert på dine Strava-aktiviteter
