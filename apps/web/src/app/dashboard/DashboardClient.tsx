@@ -1341,13 +1341,16 @@ export default function DashboardClient({
     distance: string;
     pace: string;
     icon: string;
+    completed: boolean;
+    completedDay: string | null;
+    comment: string;
   };
 
   const currentWeekNum = getCurrentWeek();
   const [viewingWeek, setViewingWeek] = useState(currentWeekNum);
   const viewingWeekData = WEEKS.find((w) => w.week === viewingWeek) ?? WEEKS[0];
 
-  const weekStorageKey = (wk: number) => `runai-week-${wk}-sessions-v2`;
+  const weekStorageKey = (wk: number) => `runai-week-${wk}-sessions-v3`;
 
   const blankTemplate = (weekNum: number): EditableSession[] => {
     const wd = WEEKS.find((w) => w.week === weekNum) ?? WEEKS[0];
@@ -1355,22 +1358,50 @@ export default function DashboardClient({
       id: `w${weekNum}-${i}`,
       day: s.day,
       type: s.type,
-      distance: "",
-      pace: "",
+      distance: s.distance,
+      pace: s.pace,
       icon: iconForType(s.type),
+      completed: false,
+      completedDay: null,
+      comment: "",
     }));
   };
 
-  const loadWeekSessions = (wk: number): EditableSession[] => {
-    if (typeof window === "undefined") return blankTemplate(wk);
+  const loadWeekSessionsFromStorage = (wk: number): EditableSession[] | null => {
+    if (typeof window === "undefined") return null;
     try {
       const raw = localStorage.getItem(weekStorageKey(wk));
       if (raw) return JSON.parse(raw) as EditableSession[];
     } catch { /* ignore */ }
-    return blankTemplate(wk);
+    return null;
   };
 
-  const [weekSessions, setWeekSessions] = useState<EditableSession[]>(() => loadWeekSessions(currentWeekNum));
+  const [weekSessions, setWeekSessions] = useState<EditableSession[]>(
+    () => loadWeekSessionsFromStorage(currentWeekNum) ?? blankTemplate(currentWeekNum)
+  );
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+
+  // Load from Supabase on mount and when week changes
+  useEffect(() => {
+    setSessionsLoading(true);
+    fetch(`/api/sessions?week=${viewingWeek}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.sessions)) {
+          setWeekSessions(d.sessions as EditableSession[]);
+          try { localStorage.setItem(weekStorageKey(viewingWeek), JSON.stringify(d.sessions)); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => {
+        // Offline: fall back to localStorage
+        const cached = loadWeekSessionsFromStorage(viewingWeek);
+        if (cached) setWeekSessions(cached);
+        else setWeekSessions(blankTemplate(viewingWeek));
+      })
+      .finally(() => setSessionsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingWeek]);
+
 
   // ── Redigerbar målpace ──────────────────────────────────────────────────
   const [targetPaceSec, setTargetPaceSec] = useState<number>(() => {
@@ -1422,24 +1453,47 @@ export default function DashboardClient({
     distance: "",
     pace: "",
     icon: iconForType("Rolig jogg"),
+    completed: false,
+    completedDay: null,
+    comment: "",
   });
+  // Completion dialog state
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmDay, setConfirmDay] = useState<string>("Man");
+  const [confirmComment, setConfirmComment] = useState<string>("");
+  // Inline comment edit
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState("");
+  // Generate next week
+  const [generatingNextWeek, setGeneratingNextWeek] = useState(false);
+  const [generateNote, setGenerateNote] = useState<string | null>(null);
 
   const navigateWeek = (delta: number) => {
     const next = Math.max(1, Math.min(TOTAL_WEEKS, viewingWeek + delta));
     setViewingWeek(next);
-    setWeekSessions(loadWeekSessions(next));
     setEditingId(null);
     setEditDraft({});
     setShowAddForm(false);
+    setConfirmingId(null);
+    setEditingCommentId(null);
+    setGenerateNote(null);
   };
 
   const saveSessions = (sessions: EditableSession[]) => {
     setWeekSessions(sessions);
+    // Optimistic localStorage
     try { localStorage.setItem(weekStorageKey(viewingWeek), JSON.stringify(sessions)); } catch { /* ignore */ }
+    // Persist to Supabase
+    fetch("/api/sessions", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ week: viewingWeek, sessions }),
+    }).catch(() => { /* silent — localStorage is fallback */ });
   };
 
   const startEdit = (s: EditableSession) => {
     setShowAddForm(false);
+    setConfirmingId(null);
     setEditingId(s.id);
     setEditDraft({ day: s.day, type: s.type, distance: s.distance, pace: s.pace, icon: s.icon });
   };
@@ -1463,11 +1517,56 @@ export default function DashboardClient({
     if (!newSession.type.trim()) return;
     const s: EditableSession = { ...newSession, id: `custom-${Date.now()}` };
     saveSessions([...weekSessions, s]);
-    setNewSession({ day: "Man", type: "Rolig jogg", distance: "", pace: "", icon: iconForType("Rolig jogg") });
+    setNewSession({ day: "Man", type: "Rolig jogg", distance: "", pace: "", icon: iconForType("Rolig jogg"), completed: false, completedDay: null, comment: "" });
     setShowAddForm(false);
   };
 
   const resetToDefault = () => saveSessions(blankTemplate(viewingWeek));
+
+  // Mark a session as completed (or un-complete it)
+  const confirmComplete = () => {
+    if (!confirmingId) return;
+    saveSessions(weekSessions.map((s) =>
+      s.id === confirmingId
+        ? { ...s, completed: true, completedDay: confirmDay, comment: confirmComment || s.comment }
+        : s
+    ));
+    setConfirmingId(null);
+  };
+
+  const uncomplete = (id: string) => {
+    saveSessions(weekSessions.map((s) =>
+      s.id === id ? { ...s, completed: false, completedDay: null } : s
+    ));
+  };
+
+  const saveComment = (id: string) => {
+    saveSessions(weekSessions.map((s) =>
+      s.id === id ? { ...s, comment: commentDraft } : s
+    ));
+    setEditingCommentId(null);
+  };
+
+  const handleGenerateNextWeek = async () => {
+    setGeneratingNextWeek(true);
+    setGenerateNote(null);
+    try {
+      const res = await fetch("/api/generate-week", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentWeek: viewingWeek, completedSessions: weekSessions }),
+      });
+      const data = await res.json();
+      if (data.sessions) {
+        // Cache the generated sessions for next week
+        try { localStorage.setItem(weekStorageKey(viewingWeek + 1), JSON.stringify(data.sessions)); } catch { /* ignore */ }
+        setGenerateNote(data.coachNote ?? null);
+        // Navigate to next week after short delay
+        setTimeout(() => navigateWeek(1), 1200);
+      }
+    } catch { /* silent */ }
+    finally { setGeneratingNextWeek(false); }
+  };
   // ────────────────────────────────────────────────────────────────────────
 
   const recentRuns = stravaData.recentRuns ?? [];
@@ -1813,7 +1912,7 @@ export default function DashboardClient({
         {/* ── Tab: Økter ── */}
         {activeTab === "okter" && (
           <div>
-            {/* Ukens plan — redigerbar med vekenavigasjon */}
+            {/* Ukens plan */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5">
               {/* Vekenavigasjon */}
               <div className="flex items-center justify-between mb-1">
@@ -1855,16 +1954,30 @@ export default function DashboardClient({
 
               {viewingWeek === currentWeekNum && <PhaseCompletionBadge recentRuns={recentRuns} />}
 
+              {/* Session list — sorted: completed first (by day), then uncompleted */}
+              {sessionsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-14 bg-[#F0F0EE] rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              ) : (
               <div className="space-y-2">
-                {weekSessions.map((session) => {
-                  const done = viewingWeek === currentWeekNum && isSessionDone(session.day, recentRuns);
+                {[
+                  ...weekSessions.filter((s) => s.completed).sort((a, b) => (DAY_IDX[a.completedDay ?? a.day] ?? 0) - (DAY_IDX[b.completedDay ?? b.day] ?? 0)),
+                  ...weekSessions.filter((s) => !s.completed),
+                ].map((session) => {
                   const isEditing = editingId === session.id;
+                  const isConfirming = confirmingId === session.id;
+                  const isEditingComment = editingCommentId === session.id;
 
+                  // ── Edit form ──────────────────────────────────────────
                   if (isEditing) {
                     return (
                       <div key={session.id} className="rounded-xl border border-[#FC5200] bg-orange-50 p-3 space-y-2">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-lg">{iconForType(editDraft.type ?? session.type)}</span>
+                          <span className="text-xs font-semibold text-[#FC5200]">Rediger økt</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -1880,7 +1993,7 @@ export default function DashboardClient({
                             </select>
                           </div>
                           <div>
-                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type aktivitet</label>
+                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type</label>
                             <select
                               value={editDraft.type ?? session.type}
                               onChange={(e) => setEditDraft((d) => ({ ...d, type: e.target.value }))}
@@ -1894,7 +2007,7 @@ export default function DashboardClient({
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Distanse / varighet</label>
+                            <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Distanse</label>
                             <input
                               type="text"
                               value={editDraft.distance ?? session.distance}
@@ -1915,22 +2028,13 @@ export default function DashboardClient({
                           </div>
                         </div>
                         <div className="flex gap-2 pt-1">
-                          <button
-                            onClick={commitEdit}
-                            className="flex items-center gap-1 text-xs font-semibold bg-[#FC5200] text-white rounded-lg px-3 py-1.5 hover:bg-[#e04a00] transition-colors"
-                          >
+                          <button onClick={commitEdit} className="flex items-center gap-1 text-xs font-semibold bg-[#FC5200] text-white rounded-lg px-3 py-1.5 hover:bg-[#e04a00] transition-colors">
                             <Check className="h-3 w-3" /> Lagre
                           </button>
-                          <button
-                            onClick={cancelEdit}
-                            className="flex items-center gap-1 text-xs font-semibold bg-[#F0F0EE] text-[#6B6B65] rounded-lg px-3 py-1.5 hover:bg-[#E5E5E2] transition-colors"
-                          >
+                          <button onClick={cancelEdit} className="flex items-center gap-1 text-xs font-semibold bg-[#F0F0EE] text-[#6B6B65] rounded-lg px-3 py-1.5 hover:bg-[#E5E5E2] transition-colors">
                             <X className="h-3 w-3" /> Avbryt
                           </button>
-                          <button
-                            onClick={() => { cancelEdit(); deleteSession(session.id); }}
-                            className="ml-auto flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors"
-                          >
+                          <button onClick={() => { cancelEdit(); deleteSession(session.id); }} className="ml-auto flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors">
                             <Trash2 className="h-3 w-3" /> Slett
                           </button>
                         </div>
@@ -1938,42 +2042,145 @@ export default function DashboardClient({
                     );
                   }
 
+                  // ── Session card ────────────────────────────────────────
                   return (
-                    <button
+                    <div
                       key={session.id}
-                      onClick={() => startEdit(session)}
-                      className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors text-left ${
-                        done
-                          ? "bg-emerald-50 border border-emerald-200 hover:border-emerald-300"
-                          : "bg-[#F8F8F7] border border-transparent hover:border-[#FC5200] hover:bg-orange-50"
+                      className={`rounded-xl border transition-colors ${
+                        session.completed
+                          ? "bg-emerald-50 border-emerald-200"
+                          : "bg-[#F8F8F7] border-transparent"
                       }`}
                     >
-                      <span className="text-lg leading-none shrink-0">{session.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-[#111110]">{session.day}</span>
-                          <span className="text-xs text-[#6B6B65] truncate">{session.type}</span>
-                        </div>
-                        {(session.distance || session.pace) ? (
+                      {/* Main row */}
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <span className="text-lg leading-none shrink-0">{session.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-bold ${session.completed ? "text-emerald-700" : "text-[#111110]"}`}>
+                              {session.completed ? (session.completedDay ?? session.day) : session.day}
+                            </span>
+                            <span className={`text-xs truncate ${session.completed ? "text-emerald-600 line-through" : "text-[#6B6B65]"}`}>
+                              {session.type}
+                            </span>
+                          </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             {session.distance && <span className="text-[10px] text-[#9B9B95]">{session.distance}</span>}
                             {session.distance && session.pace && <span className="text-[10px] text-[#9B9B95]">·</span>}
                             {session.pace && <span className="text-[10px] text-[#9B9B95]">{session.pace}</span>}
                           </div>
-                        ) : (
-                          <p className="text-[10px] text-[#C8C8C4] mt-0.5 italic">Klikk for å fylle inn</p>
-                        )}
+                        </div>
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {session.completed ? (
+                            <button
+                              onClick={() => uncomplete(session.id)}
+                              title="Angre gjennomføring"
+                              className="w-7 h-7 flex items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-red-400 transition-colors text-xs font-bold"
+                            >
+                              ✓
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setConfirmingId(session.id);
+                                setConfirmDay(session.day);
+                                setConfirmComment(session.comment ?? "");
+                              }}
+                              title="Merk som gjennomført"
+                              className="w-7 h-7 flex items-center justify-center rounded-full border-2 border-[#D0D0CC] text-[#9B9B95] hover:border-emerald-500 hover:text-emerald-600 transition-colors text-xs font-bold"
+                            >
+                              ✓
+                            </button>
+                          )}
+                          <button
+                            onClick={() => startEdit(session)}
+                            className="p-1 rounded-lg hover:bg-[#E5E5E2] transition-colors"
+                            title="Rediger"
+                          >
+                            <Pencil className="h-3.5 w-3.5 text-[#C8C8C4]" />
+                          </button>
+                        </div>
                       </div>
-                      {done && (
-                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 rounded-full px-2 py-0.5 shrink-0">
-                          ✓ Gjort
-                        </span>
+
+                      {/* Completion dialog */}
+                      {isConfirming && (
+                        <div className="mx-3 mb-3 p-3 bg-white border border-emerald-200 rounded-xl space-y-2">
+                          <p className="text-xs font-semibold text-[#111110]">Hvilken dag gjennomførte du dette?</p>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"].map((d) => (
+                              <button
+                                key={d}
+                                onClick={() => setConfirmDay(d)}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                                  confirmDay === d
+                                    ? "bg-emerald-500 text-white"
+                                    : "bg-[#F0F0EE] text-[#6B6B65] hover:bg-emerald-100"
+                                }`}
+                              >
+                                {d}
+                              </button>
+                            ))}
+                          </div>
+                          <textarea
+                            rows={2}
+                            value={confirmComment}
+                            onChange={(e) => setConfirmComment(e.target.value)}
+                            placeholder="Kommentar (valgfritt) — Hvordan gikk det?"
+                            className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:border-emerald-400 placeholder:text-[#C8C8C4]"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={confirmComplete}
+                              className="flex items-center gap-1 text-xs font-semibold bg-emerald-500 text-white rounded-lg px-3 py-1.5 hover:bg-emerald-600 transition-colors"
+                            >
+                              <Check className="h-3 w-3" /> Gjennomført!
+                            </button>
+                            <button
+                              onClick={() => setConfirmingId(null)}
+                              className="text-xs text-[#9B9B95] hover:text-[#6B6B65] px-2 py-1.5 transition-colors"
+                            >
+                              Avbryt
+                            </button>
+                          </div>
+                        </div>
                       )}
-                      <Pencil className="h-3 w-3 text-[#C8C8C4] shrink-0" />
-                    </button>
+
+                      {/* Comment display (when completed + not confirming) */}
+                      {session.completed && !isConfirming && (
+                        <div className="mx-3 mb-2.5">
+                          {isEditingComment ? (
+                            <div className="space-y-1.5">
+                              <textarea
+                                rows={2}
+                                autoFocus
+                                value={commentDraft}
+                                onChange={(e) => setCommentDraft(e.target.value)}
+                                className="w-full text-xs border border-[#E5E5E2] rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:border-emerald-400"
+                              />
+                              <div className="flex gap-2">
+                                <button onClick={() => saveComment(session.id)} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Lagre</button>
+                                <button onClick={() => setEditingCommentId(null)} className="text-xs text-[#9B9B95]">Avbryt</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingCommentId(session.id); setCommentDraft(session.comment ?? ""); }}
+                              className="text-[10px] text-[#9B9B95] hover:text-emerald-600 text-left w-full transition-colors"
+                            >
+                              {session.comment?.trim()
+                                ? <span className="italic">&ldquo;{session.comment}&rdquo;</span>
+                                : <span className="opacity-60">+ Legg til kommentar</span>
+                              }
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
+              )}
 
               {/* Legg til ny økt */}
               {showAddForm ? (
@@ -1993,7 +2200,7 @@ export default function DashboardClient({
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type aktivitet</label>
+                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Type</label>
                       <select
                         value={newSession.type}
                         onChange={(e) => setNewSession((s) => ({ ...s, type: e.target.value, icon: iconForType(e.target.value) }))}
@@ -2007,7 +2214,7 @@ export default function DashboardClient({
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Distanse / varighet</label>
+                      <label className="text-[10px] text-[#6B6B65] font-medium block mb-0.5">Distanse</label>
                       <input
                         type="text"
                         value={newSession.distance}
@@ -2028,16 +2235,10 @@ export default function DashboardClient({
                     </div>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <button
-                      onClick={addSession}
-                      className="flex items-center gap-1 text-xs font-semibold bg-[#FC5200] text-white rounded-lg px-3 py-1.5 hover:bg-[#e04a00] transition-colors"
-                    >
+                    <button onClick={addSession} className="flex items-center gap-1 text-xs font-semibold bg-[#FC5200] text-white rounded-lg px-3 py-1.5 hover:bg-[#e04a00] transition-colors">
                       <Plus className="h-3 w-3" /> Legg til
                     </button>
-                    <button
-                      onClick={() => setShowAddForm(false)}
-                      className="flex items-center gap-1 text-xs font-semibold bg-[#F0F0EE] text-[#6B6B65] rounded-lg px-3 py-1.5 hover:bg-[#E5E5E2] transition-colors"
-                    >
+                    <button onClick={() => setShowAddForm(false)} className="flex items-center gap-1 text-xs font-semibold bg-[#F0F0EE] text-[#6B6B65] rounded-lg px-3 py-1.5 hover:bg-[#E5E5E2] transition-colors">
                       <X className="h-3 w-3" /> Avbryt
                     </button>
                   </div>
@@ -2049,6 +2250,34 @@ export default function DashboardClient({
                 >
                   <Plus className="h-3.5 w-3.5" /> Legg til økt
                 </button>
+              )}
+
+              {/* Generate next week */}
+              {viewingWeek === currentWeekNum && viewingWeek < TOTAL_WEEKS && (
+                <div className="mt-4 pt-4 border-t border-[#F0F0EE]">
+                  {generateNote && (
+                    <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                      <p className="text-xs text-emerald-700 italic">&ldquo;{generateNote}&rdquo;</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleGenerateNextWeek}
+                    disabled={generatingNextWeek}
+                    className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-[#FC5200] border border-[#FC5200] rounded-xl py-2.5 hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {generatingNextWeek ? (
+                      <>
+                        <span className="inline-block w-3.5 h-3.5 border-2 border-[#FC5200] border-t-transparent rounded-full animate-spin" />
+                        Genererer neste uke…
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-3.5 w-3.5" />
+                        Generer neste ukes plan med AI
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
 
               {viewingWeek === currentWeekNum && <WeeklyProgressBar recentRuns={recentRuns} />}
