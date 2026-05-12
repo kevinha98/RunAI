@@ -83,7 +83,7 @@ Treningstempo (P5k = ${fmt(p5k)}):
   Rolig jogg: ${fmt(p5k + 90)}
   Langtur: ${fmt(p5k + 75)}
   Terskel: ${fmt(p5k + 20)}
-  Intervall: ${fmt(p5k - 12)}`;
+  Intervall: ${fmt(p5k - 10)}`;
         })()
       : "Ingen 5K-tid registrert.";
 

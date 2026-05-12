@@ -138,10 +138,10 @@ export async function POST(req: NextRequest) {
       ? (() => {
           const p5k = fiveKSeconds / 5;
           return {
-            "Lett løping":  p5k + 75,
-            "Langkjøring":  p5k + 90,
+            "Lett løping":  p5k + 90,
+            "Langkjøring":  p5k + 75,
             "Terskelløkt":  p5k + 20,
-            "Intervall":    p5k - 12,
+            "Intervall":    p5k - 10,
           };
         })()
       : null;

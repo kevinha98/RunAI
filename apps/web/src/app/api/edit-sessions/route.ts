@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
         ? (() => {
             const p5k = fiveKSeconds / 5;
             const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}/km`;
-            return `\nP5k-baserte målfartsoner:\n  Rolig: ${fmt(p5k + 75)} | Langtur: ${fmt(p5k + 90)} | Terskel: ${fmt(p5k + 20)} | Intervall: ${fmt(p5k - 12)}`;
+            return `\nP5k-baserte målfartsoner:\n  Rolig: ${fmt(p5k + 90)} | Langtur: ${fmt(p5k + 75)} | Terskel: ${fmt(p5k + 20)} | Intervall: ${fmt(p5k - 10)}`;
           })()
         : "";
 
