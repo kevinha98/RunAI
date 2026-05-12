@@ -42,6 +42,25 @@ export const SESSION_ICONS: Record<string, string> = {
   Mobilitet: "🧘",
 };
 
+/** Returns a short interval description for display in session cards, e.g. "5×1000 m" or "3×15 min". */
+export function getIntervalLabel(type: string, distStr: string): string | undefined {
+  if (type !== "Terskel\u00f8kt" && type !== "Intervall" && type !== "Terskelintervall") return undefined;
+  const km = parseFloat(distStr);
+  if (isNaN(km) || km <= 0) return undefined;
+
+  if (type === "Intervall") {
+    // ~4 km warmup+cooldown, 1 km per rep
+    const reps = Math.max(4, Math.round(km - 4));
+    return `${reps}\u00d71000 m`;
+  }
+
+  // Terskel\u00f8kt — time-based
+  if (km <= 8) return "2\u00d720 min";
+  if (km <= 10) return "3\u00d715 min";
+  if (km <= 11) return "3\u00d715 min";
+  return "4\u00d712 min";
+}
+
 export const WEEKS: Week[] = [
   {
     week: 1, phase: "Grunntrening", totalKm: 32,

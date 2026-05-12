@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import type { StoredStats, StravaActivity } from "@/lib/strava-types";
 import { formatPace, computePaceZoneDistribution, computePersonalBests } from "@/lib/strava-types";
-import { getCurrentWeek, WEEKS, PLAN_START, RACE_DATE as RACE_DATE_OBJ, TOTAL_WEEKS } from "@/lib/plan-data";
+import { getCurrentWeek, WEEKS, PLAN_START, RACE_DATE as RACE_DATE_OBJ, TOTAL_WEEKS, getIntervalLabel } from "@/lib/plan-data";
 import type { Phase, Week } from "@/lib/plan-data";
 import { cameronPredict, DIST, formatTime } from "@/lib/race-predictor";
 import { InfoPopup, StorageBadge } from "@/components/InfoPopup";
@@ -2145,6 +2145,11 @@ export default function DashboardClient({
                             <span className={`text-xs font-semibold truncate ${session.completed ? "text-emerald-600 line-through" : "text-[#111110]"}`}>
                               {session.type}
                             </span>
+                            {getIntervalLabel(session.type, session.distance) && (
+                              <span className="text-[10px] font-medium text-[#FC5200] bg-orange-50 px-1.5 py-0.5 rounded-full shrink-0">
+                                {getIntervalLabel(session.type, session.distance)}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             {session.distance && <span className="text-[10px] text-[#9B9B95]">{session.distance}</span>}
