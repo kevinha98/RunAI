@@ -80,8 +80,8 @@ export async function refreshAthleteProfile(
           };
           return `5K-tid: ${Math.floor(fiveKSeconds / 60)}:${String(Math.round(fiveKSeconds % 60)).padStart(2, "0")}
 Treningstempo (P5k = ${fmt(p5k)}):
-  Rolig jogg: ${fmt(p5k + 75)}
-  Langtur: ${fmt(p5k + 90)}
+  Rolig jogg: ${fmt(p5k + 90)}
+  Langtur: ${fmt(p5k + 75)}
   Terskel: ${fmt(p5k + 20)}
   Intervall: ${fmt(p5k - 12)}`;
         })()

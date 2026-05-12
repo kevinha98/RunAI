@@ -1417,10 +1417,10 @@ export default function DashboardClient({
   const applyP5kPaces = useCallback((sessions: EditableSession[], fiveK: number): EditableSession[] => {
     const p5k = fiveK / 5;
     const PACE_MAP: Record<string, number> = {
-      "Lett løping": p5k + 75,
-      "Langkjøring": p5k + 90,
+      "Lett løping": p5k + 90,
+      "Langkjøring": p5k + 75,
       "Terskelløkt": p5k + 20,
-      "Intervall": p5k - 12,
+      "Intervall": p5k - 10,
     };
     return sessions.map((s) => {
       const target = PACE_MAP[s.type];
@@ -2430,61 +2430,58 @@ export default function DashboardClient({
                     </div>
                   )}
 
-                  {/* Collapsible coach rules */}
+                  {/* Collapsible pace zones */}
                   <div className="mb-3 border border-[#E5E5E2] rounded-xl overflow-hidden">
                     <button
                       onClick={() => setShowCoachRules((v) => !v)}
                       className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-[#6B6B65] hover:bg-[#F5F5F3] transition-colors"
                     >
-                      <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-[#FC5200]" />AI-coachens justeringsregler</span>
+                      <span className="flex items-center gap-1.5"><Zap className="w-3 h-3 text-[#FC5200]" />Treningstempo (P5k-soner)</span>
                       {showCoachRules ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </button>
                     {showCoachRules && (
                       <div className="border-t border-[#E5E5E2] px-3 py-3 bg-[#FAFAF9] text-[10px] text-[#6B6B65] space-y-2">
                         <table className="w-full text-[10px]">
-                          <thead>
-                            <tr className="text-[#9B9B95]">
-                              <th className="text-left font-semibold pb-1 pr-2">Økt</th>
-                              <th className="text-left font-semibold pb-1 pr-2">RPE</th>
-                              <th className="text-left font-semibold pb-1 pr-2">Lett</th>
-                              <th className="text-left font-semibold pb-1 pr-2">Riktig</th>
-                              <th className="text-left font-semibold pb-1">Hard</th>
-                            </tr>
-                          </thead>
-                          <tbody className="[&>tr>td]:py-1 [&>tr>td]:pr-2 [&>tr]:border-t [&>tr]:border-[#F0F0EE]">
+                          <tbody className="[&>tr>td]:py-1.5 [&>tr>td]:pr-2 [&>tr]:border-t [&>tr]:border-[#F0F0EE]">
                             <tr>
-                              <td className="font-semibold text-[#111110]">Rolig jogg</td>
-                              <td className="text-[#9B9B95]">3–4</td>
-                              <td>+1–2 km</td>
-                              <td>Behold</td>
-                              <td>Senk fart / kort ned</td>
+                              <td className="font-semibold text-[#111110]">Personlig rekord 5 km</td>
+                              <td className="text-right">
+                                <input
+                                  type="text"
+                                  placeholder="mm:ss"
+                                  defaultValue={fiveKSeconds ? (() => { const tot = fiveKSeconds; const m = Math.floor(tot / 60); const s = Math.round(tot % 60); return `${m}:${String(s).padStart(2,'0')}`; })() : ''}
+                                  onBlur={(e) => {
+                                    const val = e.target.value.trim();
+                                    const match = val.match(/^(\d+):([0-5]\d)$/);
+                                    if (match) {
+                                      const secs = parseInt(match[1]) * 60 + parseInt(match[2]);
+                                      setFiveKSeconds(secs);
+                                      try { localStorage.setItem('runai-5k-pr', String(secs)); } catch { /* ignore */ }
+                                    }
+                                  }}
+                                  className="w-16 text-right border border-[#E5E5E2] rounded px-1.5 py-0.5 text-[10px] bg-white focus:outline-none focus:border-[#FC5200]"
+                                />
+                              </td>
                             </tr>
-                            <tr>
-                              <td className="font-semibold text-[#111110]">Langtur</td>
-                              <td className="text-[#9B9B95]">3–5</td>
-                              <td>+1–2 km</td>
-                              <td>Behold</td>
-                              <td>−20 % lengde + roligere</td>
-                            </tr>
-                            <tr>
-                              <td className="font-semibold text-[#111110]">Terskel</td>
-                              <td className="text-[#9B9B95]">6–7</td>
-                              <td>Øk volum → fart</td>
-                              <td>Behold</td>
-                              <td>Senk fart/volum</td>
-                            </tr>
-                            <tr>
-                              <td className="font-semibold text-[#111110]">Intervall</td>
-                              <td className="text-[#9B9B95]">8–9</td>
-                              <td>+1 drag / −5 sek</td>
-                              <td>Behold</td>
-                              <td>Færre drag / mer pause</td>
-                            </tr>
+                            {([
+                              { label: 'Terskel', offset: 20 },
+                              { label: 'Rolig jogg', offset: 90 },
+                              { label: 'Langtur', offset: 75 },
+                              { label: 'Intervall', offset: -10 },
+                            ] as { label: string; offset: number }[]).map(({ label, offset }) => {
+                              const p5kSec = fiveKSeconds ? fiveKSeconds / 5 : null;
+                                const paceStr = p5kSec
+                                ? (() => { const raw = p5kSec + offset; const m = Math.floor(raw / 60); const s = Math.round(raw % 60); return `${m}:${String(s).padStart(2,'0')}/km`; })()
+                                : offset >= 0 ? `5k + ${offset} sek/km` : `5k − ${Math.abs(offset)} sek/km`;
+                              return (
+                                <tr key={label}>
+                                  <td className="font-semibold text-[#111110]">{label}</td>
+                                  <td className="text-right text-[#FC5200] font-medium">{paceStr}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
-                        <p className="pt-1 border-t border-[#F0F0EE]">
-                          <strong className="text-[#111110]">Terskelregel:</strong> Jevn fart på alle drag <em>og</em> kunne tatt ett drag til → øk volum <em>eller</em> −5 sek/km.
-                        </p>
                       </div>
                     )}
                   </div>
