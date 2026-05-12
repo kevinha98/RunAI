@@ -1588,10 +1588,17 @@ export default function DashboardClient({
     setGeneratingNextWeek(true);
     setGenerateNote(null);
     try {
+      // Les eventuell lagret 5K-tid for AI-soner
+      let fiveKSeconds: number | undefined;
+      try {
+        const stored = localStorage.getItem("runai-5k-pr");
+        if (stored) fiveKSeconds = Number(stored);
+      } catch { /* ignore */ }
+
       const res = await fetch("/api/generate-week", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentWeek: viewingWeek, completedSessions: weekSessions }),
+        body: JSON.stringify({ currentWeek: viewingWeek, completedSessions: weekSessions, fiveKSeconds }),
       });
       const data = await res.json();
       if (data.sessions) {

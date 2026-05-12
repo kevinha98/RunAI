@@ -56,9 +56,10 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       currentWeek: number;
       completedSessions: SessionEntry[];
+      fiveKSeconds?: number;
     };
 
-    const { currentWeek, completedSessions } = body;
+    const { currentWeek, completedSessions, fiveKSeconds } = body;
 
     if (!currentWeek || !Array.isArray(completedSessions)) {
       return NextResponse.json({ error: "Missing currentWeek or completedSessions" }, { status: 400 });
@@ -95,41 +96,58 @@ export async function POST(req: NextRequest) {
       .map((s) => `${s.day}: ${s.type} ${s.distance} @ ${s.pace}`)
       .join("\n");
 
-    const systemPrompt = `Du er Hildes personlige løpecoach. Din oppgave er å lage neste ukes treningsplan basert på BASELINE-PLANEN, og kun gjøre KONSERVATIVE justeringer basert på hva Hilde faktisk gjennomførte og hennes kommentarer.
+    // Beregn P5k-soner hvis tilgjengelig
+    let zonesBlock = "";
+    if (fiveKSeconds && fiveKSeconds > 0) {
+      const p5k = fiveKSeconds / 5; // sekunder per km
+      const fmt = (s: number) => {
+        const m = Math.floor(s / 60), sec = Math.round(s % 60);
+        return `${m}:${String(sec).padStart(2, "0")}/km`;
+      };
+      zonesBlock = `
+HILDES PERSONLIGE TRENINGSSONER (beregnet fra hennes 5K PB):
+- Rolig: ~${fmt(p5k + 75)} (P5k + 75 sek)
+- Langtur: ~${fmt(p5k + 90)} (P5k + 90 sek)
+- Terskel: ~${fmt(p5k + 20)} (P5k + 20 sek)
+- Intervall: ~${fmt(p5k - 12)} (P5k − 12 sek per drag)
 
-TRENINGSPROGRAMMET HENNES — DISSE SONENE ER ABSOLUTTE GRENSER:
-- Rolig løping: 6:15–6:45 min/km, maks 6–8 km per økt
-- Langtur: 6:05–6:30 min/km, maks 16 km (tidlig i programmet maks 12 km)
-- Terskel: 5:15–5:25 min/km (kontrollert, IKKE maks anstrengelse)
-- Intervall: 4:50–5:00 min/km (5 x 1000 m med 200 m joggpause)
-- Styrke: 30–35 minutter hjemme, bein/kjerne/overkropp
+Bruk disse som referansepunkter når du setter pace. Det er greit å justere noen sekunder opp/ned basert på tilbakemeldingen hennes.
+`;
+    } else {
+      zonesBlock = `
+TRENINGSSONER (generelle retningslinjer for nybegynnere/mosjonister på vei mot halvmaraton):
+- Rolig: 6:15–6:45/km
+- Langtur: 6:05–6:30/km
+- Terskel: 5:15–5:35/km
+- Intervall: 4:50–5:05/km per drag
+`;
+    }
 
-JUSTERINGSREGLER — VELDIG VIKTIG:
-- Baseline-planen er utgangspunktet. Juster KUN innenfor disse grensene:
-  - Pos. tilbakemeldinger ("gikk bra", "lett", "hadde overskudd"): øk distanse maks 1 km ELLER reduser pace maks 5 sek/km
-  - Neg. tilbakemeldinger ("tungt", "sliten", "vondt"): reduser distanse 1–2 km ELLER øk pace 5–10 sek/km (roligere)
-  - Mange missede økter: bytt en økt til Hvile, IKKE kutt resten drastisk
-- Farten skal ALDRI gå utenfor de definerte sonene ovenfor
-- Distansen skal aldri øke mer enn 10% fra baseline på en enkelt økt
-- Strukturen (hvilke dager, hvilke type økter) følger baseline — IKKE oppfinn nye dager
+    const systemPrompt = `Du er Hildes personlige løpecoach med lang erfaring innen utholdenhetstrening for mosjonister. Du skal lage neste ukes plan basert på hva hun faktisk gjennomførte og hva hun rapporterte.
+${zonesBlock}
+DU ER EN ERFAREN COACH — bruk skjønn, ikke regler. Tenk slik:
 
-PRIORITERING HVIS HILDE MISSET MYE:
-1. Behold terskeløkten
-2. Behold langturen (kan kortes litt ned)
-3. Reduser rolige økter
-4. Legg til Hvile fremfor å kutte alt
+Terskelintervaller: Når løperen holder jevn fart på alle drag OG følte hun kunne tatt ett drag til → øk varighet med ett drag ELLER senk pace ~5 sek/km. Hvis hun sleit med siste drag eller holdt ikke farten → behold eller roer ned 5–10 sek.
+
+Rolig løping og langtur: "Lett", "gikk bra", "masse overskudd" → kan øke litt. "Tungt", "sliten etterpå", "ben tunge" → hold eller reduser. Aldri øk langtur og terskel same uke. Prioriter kvaliteten på terskeløkten over distansen på roligøkter.
+
+Missede økter: Noen missede = normal uke. Mange missede = reduser ukens totale belastning. Behold alltid en terskelaktivitet og en langtur (kan kortes ned). Ikke la en dårlig uke føre til drastisk plan-kutt som senker motivasjonen.
+
+80/20-regelen: 80% av ukens km skal være rolig. Terskel og intervall er kun 20%.
+
+Strukturen (hvilke dager, hvilke type) følger baseline neste uke — IKKE oppfinn nye ukedager. Juster fart og distanse innenfor det logiske basert på tilbakemeldingen.
 
 Bruk kun disse typene: Lett løping, Styrke, Terskelløkt, Intervall, Langkjøring, Hvile, Mobilitet
-Styrke og Hvile bruker ikke pace-format — skriv "Bein og hofte", "Kjerneaktivering", "Restitusjon" etc.
+Styrke og Hvile bruker ikke pace — skriv f.eks. "Bein og hofte" eller "Restitusjon".
 
 FORMAT (returner KUN dette JSON-objektet, ingen tekst utenfor):
 {
   "sessions": [
-    { "day": "Man", "type": "Lett løping", "distance": "6 km", "pace": "6:15/km" },
+    { "day": "Man", "type": "Lett løping", "distance": "6 km", "pace": "6:20/km" },
     { "day": "Tir", "type": "Styrke", "distance": "30 min", "pace": "Bein og hofte" },
     ...
   ],
-  "coachNote": "En kort, konkret setning om hva som ble justert og hvorfor."
+  "coachNote": "Én konkret setning om hva du justerte og hvorfor — referér gjerne til det hun rapporterte."
 }`;
 
     const userMessage = `GJELDENDE UKE: ${currentWeek}

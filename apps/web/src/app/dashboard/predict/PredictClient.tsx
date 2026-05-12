@@ -72,12 +72,16 @@ export default function PredictClient() {
     try {
       const fiveK = fiveKStr.trim() ? parseTime(fiveKStr.trim()) : undefined;
       const tenK = tenKStr.trim() ? parseTime(tenKStr.trim()) : undefined;
-      if (fiveK !== undefined && fiveK <= 0) throw new Error("5K-tid må være > 0");
-      if (tenK !== undefined && tenK <= 0) throw new Error("10K-tid må være > 0");
+      if (fiveK !== undefined && fiveK <= 0) throw new Error("5K-tid m\u00e5 v\u00e6re > 0");
+      if (tenK !== undefined && tenK <= 0) throw new Error("10K-tid m\u00e5 v\u00e6re > 0");
       const halfMarathon = predict({ fiveK, tenK, targetDist: DIST.HALF_MARATHON });
       const marathon = predict({ fiveK, tenK, targetDist: DIST.MARATHON });
       const tenKPred = fiveKStr.trim() && !tenKStr.trim() ? predict({ fiveK, tenK, targetDist: DIST.TEN_K }) : undefined;
       setResults({ halfMarathon, tenKPred, marathon });
+      // Lagre 5K-tid i localStorage slik at AI-plan-generatoren kan bruke den
+      if (fiveK) {
+        try { localStorage.setItem("runai-5k-pr", String(Math.round(fiveK))); } catch { /* ignore */ }
+      }
     } catch (e) { setError(e instanceof Error ? e.message : "Noe gikk galt"); }
   }, [fiveKStr, tenKStr]);
 
@@ -196,6 +200,45 @@ export default function PredictClient() {
               )}
             </div>
           )}
+
+          {/* P5k-baserte treningssoner */}
+          {fiveKStr.trim() && (() => {
+            try {
+              const fiveK = parseTime(fiveKStr.trim());
+              const p5k = fiveK / 5; // sekunder per km
+              const zones = [
+                { label: "Rolig", desc: "Lett jogg, prat-tempo", pace: p5k + 75 },
+                { label: "Langtur", desc: "Kontrollert og jevn", pace: p5k + 90 },
+                { label: "Terskel", desc: "Komfortabelt ubehagelig", pace: p5k + 20 },
+                { label: "Intervall", desc: "Hard innsats, 1 km drag", pace: p5k - 12 },
+              ];
+              return (
+                <div className="border border-[#E5E5E2] rounded-xl bg-white overflow-hidden">
+                  <div className="px-5 py-4 border-b border-[#E5E5E2] flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-[#FC5200]" />
+                    <span className="text-sm font-medium text-[#111110]">Treningssoner fra din 5K</span>
+                    <span className="ml-auto text-xs text-[#9B9B95]">P5k = {formatPaceMin(p5k)}</span>
+                  </div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {zones.map(({ label, desc, pace }) => (
+                        <tr key={label} className="border-t border-[#E5E5E2] first:border-t-0">
+                          <td className="px-5 py-2.5">
+                            <span className="font-medium text-[#111110]">{label}</span>
+                            <span className="ml-2 text-xs text-[#9B9B95]">{desc}</span>
+                          </td>
+                          <td className="px-5 py-2.5 text-right font-mono text-[#FC5200]">{formatPaceMin(pace)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="px-5 py-2 text-[10px] text-[#9B9B95] border-t border-[#E5E5E2] bg-[#F9F9F7]">
+                    Beregnet som P5k ± sekunder per km. Sonene sendes til AI-coachen din når du genererer treningsplan.
+                  </p>
+                </div>
+              );
+            } catch { return null; }
+          })()}
 
           {/* Science footnote */}
           <div className="border border-[#E5E5E2] rounded-xl bg-white overflow-hidden">
