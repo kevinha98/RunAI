@@ -1391,6 +1391,43 @@ export default function DashboardClient({
 
   const weekStorageKey = (wk: number) => `runai-week-${wk}-sessions-v3`;
 
+  // ── P5k-baserte soner ──────────────────────────────────────────────────────
+  const [fiveKSeconds, setFiveKSeconds] = useState<number | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("runai-5k-pr");
+      if (stored) setFiveKSeconds(Number(stored));
+    } catch { /* ignore */ }
+  }, []);
+
+  /** Compute pace string from seconds/km */
+  const fmtSessionPace = (secsPerKm: number): string => {
+    const m = Math.floor(secsPerKm / 60);
+    let s = Math.round(secsPerKm % 60);
+    if (s === 60) { return `${m + 1}:00/km`; }
+    return `${m}:${String(s).padStart(2, "0")}/km`;
+  };
+
+  /** Override paces for running sessions based on P5k formula.
+   *  Only applies to non-completed sessions from the baseline plan. */
+  const applyP5kPaces = useCallback((sessions: EditableSession[], fiveK: number): EditableSession[] => {
+    const p5k = fiveK / 5;
+    const PACE_MAP: Record<string, number> = {
+      "Lett løping": p5k + 75,
+      "Langkjøring": p5k + 90,
+      "Terskelløkt": p5k + 20,
+      "Intervall": p5k - 12,
+    };
+    return sessions.map((s) => {
+      const target = PACE_MAP[s.type];
+      if (target !== undefined && !s.completed) {
+        return { ...s, pace: fmtSessionPace(target) };
+      }
+      return s;
+    });
+  }, []);
+
   const blankTemplate = (weekNum: number): EditableSession[] => {
     const wd = WEEKS.find((w) => w.week === weekNum) ?? WEEKS[0];
     return wd.sessions.map((s, i) => ({
@@ -1427,8 +1464,14 @@ export default function DashboardClient({
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.sessions)) {
-          setWeekSessions(d.sessions as EditableSession[]);
-          try { localStorage.setItem(weekStorageKey(viewingWeek), JSON.stringify(d.sessions)); } catch { /* ignore */ }
+          // Apply P5k paces when sessions come from the baseline plan
+          const fiveK = fiveKSeconds ?? (() => {
+            try { const s = localStorage.getItem("runai-5k-pr"); return s ? Number(s) : null; } catch { return null; }
+          })();
+          const sessions = (d.sessions as EditableSession[]);
+          const applied = (fiveK && d.source === "plan") ? applyP5kPaces(sessions, fiveK) : sessions;
+          setWeekSessions(applied);
+          try { localStorage.setItem(weekStorageKey(viewingWeek), JSON.stringify(applied)); } catch { /* ignore */ }
         }
       })
       .catch(() => {
@@ -1439,7 +1482,7 @@ export default function DashboardClient({
       })
       .finally(() => setSessionsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewingWeek]);
+  }, [viewingWeek, fiveKSeconds]);
 
 
   // ── Redigerbar målpace ──────────────────────────────────────────────────

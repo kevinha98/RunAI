@@ -96,31 +96,29 @@ export async function POST(req: NextRequest) {
       .map((s) => `${s.day}: ${s.type} ${s.distance} @ ${s.pace}`)
       .join("\n");
 
-    // Beregn P5k-soner hvis tilgjengelig
+    // Beregn P5k-soner — dette er den eneste pacekilden for genererte planer
+    const fmt = (s: number) => {
+      const m = Math.floor(s / 60), sec = Math.round(s % 60);
+      return `${m}:${String(sec).padStart(2, "0")}/km`;
+    };
+
     let zonesBlock = "";
     if (fiveKSeconds && fiveKSeconds > 0) {
-      const p5k = fiveKSeconds / 5; // sekunder per km
-      const fmt = (s: number) => {
-        const m = Math.floor(s / 60), sec = Math.round(s % 60);
-        return `${m}:${String(sec).padStart(2, "0")}/km`;
-      };
-      zonesBlock = `
-HILDES PERSONLIGE TRENINGSSONER (beregnet fra hennes 5K PB):
-- Rolig: ~${fmt(p5k + 75)} (P5k + 75 sek)
-- Langtur: ~${fmt(p5k + 90)} (P5k + 90 sek)
-- Terskel: ~${fmt(p5k + 20)} (P5k + 20 sek)
-- Intervall: ~${fmt(p5k - 12)} (P5k − 12 sek per drag)
+      const p5k = fiveKSeconds / 5;
+      zonesBlock = `HILDES PERSONLIGE TRENINGSSONER — DISSE ER DE ENESTE GYLDIGE PACE-VERDIENE DU KAN BRUKE:
+- Lett løping: ${fmt(p5k + 75)} (P5k + 75 sek/km) — kun ±5 sek justering tillatt
+- Langkjøring: ${fmt(p5k + 90)} (P5k + 90 sek/km) — kun ±5 sek justering tillatt
+- Terskelløkt: ${fmt(p5k + 20)} (P5k + 20 sek/km) — kun ±5 sek justering tillatt
+- Intervall: ${fmt(p5k - 12)} (P5k − 12 sek/km) — kun ±3 sek justering tillatt
 
-Bruk disse som referansepunkter når du setter pace. Det er greit å justere noen sekunder opp/ned basert på tilbakemeldingen hennes.
-`;
+MERK: Ignorer alle pace-verdier fra baseline-planen nedenfor — de er generiske og ikke tilpasset Hilde.
+Du MÅ bruke sonene ovenfor som startpunkt, og kun justere basert på tilbakemeldingene.`;
     } else {
-      zonesBlock = `
-TRENINGSSONER (generelle retningslinjer for nybegynnere/mosjonister på vei mot halvmaraton):
-- Rolig: 6:15–6:45/km
-- Langtur: 6:05–6:30/km
-- Terskel: 5:15–5:35/km
-- Intervall: 4:50–5:05/km per drag
-`;
+      zonesBlock = `GENERELLE TRENINGSSONER (brukes kun om ingen 5K-tid er registrert):
+- Lett løping: 6:20/km
+- Langkjøring: 6:30/km
+- Terskelløkt: 5:25/km
+- Intervall: 5:05/km`;
     }
 
     const systemPrompt = `Du er Hildes personlige løpecoach med lang erfaring innen utholdenhetstrening for mosjonister. Du skal lage neste ukes plan basert på hva hun faktisk gjennomførte og hva hun rapporterte.
