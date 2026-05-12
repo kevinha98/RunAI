@@ -96,6 +96,12 @@ export default async function DashboardSidebar({ stats, activePath }: Props) {
                 <RefreshCw size={9} /> Synkroniser
               </button>
             </form>
+            <a
+              href="/api/strava/connect"
+              className="mt-1 pl-6 flex items-center gap-1 text-[10px] text-[#6B6B65] hover:text-[#FC5200] transition-colors"
+            >
+              <RefreshCw size={9} /> Koble til på nytt
+            </a>
           </div>
         ) : (
           <a
