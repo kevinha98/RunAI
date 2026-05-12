@@ -14,8 +14,9 @@ import { refreshAthleteProfile } from "@/lib/refresh-profile";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-// Re-export so other routes can still import from this path if needed
-export { refreshAthleteProfile } from "@/lib/refresh-profile";
+// NOTE: Do NOT re-export non-HTTP-handler functions from route files —
+// Next.js only allows GET/POST/etc. as named exports here.
+// Import refreshAthleteProfile directly from "@/lib/refresh-profile" instead.
 
 async function resolveUserId(): Promise<string | null> {
   const supabase = await createClient();
