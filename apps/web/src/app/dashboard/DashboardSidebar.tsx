@@ -88,7 +88,7 @@ export default async function DashboardSidebar({ stats, activePath }: Props) {
                 Synk {new Date(lastSync).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
               </div>
             )}
-            <form action="/api/strava/sync" method="POST" className="mt-1.5 pl-6">
+            <form action="/api/strava/sync?force=1" method="POST" className="mt-1.5 pl-6">
               <button
                 type="submit"
                 className="flex items-center gap-1 text-[10px] text-[#6B6B65] hover:text-[#FC5200] transition-colors"

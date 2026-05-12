@@ -267,6 +267,12 @@ export async function POST(req: NextRequest) {
 
     logSyncTimestamp(userId, syncTimestamp, activities.length, runs.length);
 
+    // If called from a browser form (Accept: text/html), redirect back to dashboard
+    const acceptsHtml = req.headers.get("accept")?.includes("text/html") ?? false;
+    if (acceptsHtml) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+
     return NextResponse.json(
       {
         ok: true,
@@ -283,6 +289,15 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const isAuthError = message.includes("401") || message.includes("Authorization Error") || message.includes("No Strava connection");
+    // If called from a browser form, redirect back with error state
+    const acceptsHtml = req.headers.get("accept")?.includes("text/html") ?? false;
+    if (acceptsHtml && isAuthError) {
+      return NextResponse.redirect(new URL("/dashboard?strava=reconnect", req.url));
+    }
+    return NextResponse.json(
+      { error: isAuthError ? "Strava-tilkoblingen er utløpt. Gå til /api/strava/connect for å koble til på nytt." : message },
+      { status: isAuthError ? 401 : 500 }
+    );
   }
 }

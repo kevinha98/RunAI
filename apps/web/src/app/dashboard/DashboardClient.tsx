@@ -1688,7 +1688,7 @@ export default function DashboardClient({
 
   const handleSync = useCallback(async () => {
     try {
-      await fetch("/api/strava/sync", { method: "POST" });
+      await fetch("/api/strava/sync?force=1", { method: "POST" });
     } catch { /* silent */ }
     router.refresh();
   }, [router]);
@@ -1698,6 +1698,8 @@ export default function DashboardClient({
   const statusMessage =
     stravaStatus === "connected"
       ? "✅ Strava-konto koblet til! Data synkroniseres."
+      : stravaStatus === "reconnect"
+      ? "⚠️ Strava-tilkoblingen er utløpt."
       : stravaStatus === "error"
       ? "❌ Kunne ikke koble til Strava. Prøv igjen."
       : null;
@@ -1711,10 +1713,14 @@ export default function DashboardClient({
             className={`mb-4 flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium border ${
               stravaStatus === "connected"
                 ? "bg-green-50 border-green-200 text-green-800"
+                : stravaStatus === "reconnect"
+                ? "bg-amber-50 border-amber-200 text-amber-800"
                 : "bg-red-50 border-red-200 text-red-800"
             }`}
           >
-            <span>{statusMessage}</span>
+            <span>{statusMessage}{stravaStatus === "reconnect" && (
+              <a href="/api/strava/connect" className="ml-2 underline font-semibold">Koble til på nytt →</a>
+            )}</span>
             <button
               onClick={() => setDismissedStatus(true)}
               className="ml-3 text-current opacity-60 hover:opacity-100 transition-opacity"
