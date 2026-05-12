@@ -22,6 +22,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from "lucide-react";
 import type { StoredStats, StravaActivity } from "@/lib/strava-types";
 import { formatPace, computePaceZoneDistribution, computePersonalBests } from "@/lib/strava-types";
@@ -1687,12 +1688,30 @@ export default function DashboardClient({
   }, [stravaData.lastSync]);
 
   const isSyncFresh = syncAgeMinutes !== null && syncAgeMinutes < 10;
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const handleSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncError(null);
     try {
-      await fetch("/api/strava/sync?force=1", { method: "POST" });
-    } catch { /* silent */ }
-    router.refresh();
+      const res = await fetch("/api/strava/sync?force=1", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = data.error ?? `Feil ${res.status}`;
+        if (res.status === 401) {
+          setSyncError("Token utløpt – klikk «Koble til på nytt» i sidemenyen.");
+        } else {
+          setSyncError(msg);
+        }
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setSyncError("Nettverksfeil – sjekk tilkoblingen.");
+    } finally {
+      setSyncing(false);
+    }
   }, [router]);
 
   // Status banner
@@ -1747,13 +1766,22 @@ export default function DashboardClient({
             {isSyncFresh && <SyncFreshDot />}
             <button
               onClick={handleSync}
-              className="flex items-center gap-1.5 rounded-full bg-[#FC5200] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#E04A00] transition-colors"
+              disabled={syncing}
+              className="flex items-center gap-1.5 rounded-full bg-[#FC5200] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#E04A00] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Play className="h-3 w-3" />
-              Synk
+              {syncing
+                ? <><RefreshCw className="h-3 w-3 animate-spin" /> Synkroniserer…</>
+                : <><Play className="h-3 w-3" /> Synk</>
+              }
             </button>
           </div>
         </div>
+        {syncError && (
+          <div className="mb-4 flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium border bg-red-50 border-red-200 text-red-800">
+            <span>❌ {syncError}</span>
+            <button onClick={() => setSyncError(null)} className="ml-3 opacity-60 hover:opacity-100"><X className="h-4 w-4" /></button>
+          </div>
+        )}
 
         {/* Marathon countdown */}
         <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
