@@ -5,6 +5,7 @@ import { readUserStats } from "@/lib/stats-store";
 import { formatPace } from "@/lib/strava-types";
 import { createClient } from "@/lib/supabase/server";
 import { WEEKS, getCurrentWeek, RACE_DATE, TOTAL_WEEKS } from "@/lib/plan-data";
+import { buildProfileBlock } from "@/lib/db/athlete-profile";
 import type { StoredStats } from "@/lib/strava-types";
 
 // Allow up to 60 s for the agentic tool loop on Vercel
@@ -415,24 +416,27 @@ export async function POST(req: NextRequest) {
     }
 
     // Load stats (falls back to empty stats if no userId)
-    const stats: StoredStats = resolvedUserId
-      ? await readUserStats(resolvedUserId)
-      : {
-          athlete: null,
-          computed: {
-            weeklyKm: 0,
-            weeklyRuns: 0,
-            avgPaceSecPerKm: 0,
-            longestRunKm: 0,
-            totalRunsAllTime: 0,
-            totalKmAllTime: 0,
-            ytdKm: 0,
-          },
-          recentRuns: [],
-          recentActivities: [],
-          stravaStats: null,
-          lastSync: "",
-        };
+    const [stats, profileBlock]: [StoredStats, string] = await Promise.all([
+      resolvedUserId
+        ? readUserStats(resolvedUserId)
+        : Promise.resolve({
+            athlete: null,
+            computed: {
+              weeklyKm: 0,
+              weeklyRuns: 0,
+              avgPaceSecPerKm: 0,
+              longestRunKm: 0,
+              totalRunsAllTime: 0,
+              totalKmAllTime: 0,
+              ytdKm: 0,
+            },
+            recentRuns: [],
+            recentActivities: [],
+            stravaStats: null,
+            lastSync: "",
+          }),
+      resolvedUserId ? buildProfileBlock(resolvedUserId) : Promise.resolve(""),
+    ]);
 
     // Context window management: keep last N messages, always end on a user message
     let trimmed = messages
@@ -452,7 +456,10 @@ export async function POST(req: NextRequest) {
     const MAX_TOOL_TURNS = 5;
 
     const client = getClient();
-    const systemPrompt = buildSystemPrompt(stats);
+    const baseSystemPrompt = buildSystemPrompt(stats);
+    const systemPrompt = profileBlock
+      ? `${profileBlock}\n\n${baseSystemPrompt}`
+      : baseSystemPrompt;
 
     for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
       const response = await client.messages.create({

@@ -1,6 +1,6 @@
 ﻿import Link from "next/link";
 import Image from "next/image";
-import { Activity, Calendar, Brain, TrendingUp, Zap, ClipboardList, RefreshCw, Settings, Timer } from "lucide-react";
+import { Activity, Calendar, Brain, TrendingUp, Zap, ClipboardList, RefreshCw, Settings, Timer, User, MessageSquare } from "lucide-react";
 import type { StoredStats } from "@/lib/strava-types";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -19,9 +19,11 @@ const NAV_ITEMS = [
   { icon: Activity, label: "Oversikt", href: "/dashboard" },
   { icon: Calendar, label: "Treningsplan", href: "/dashboard/plan" },
   { icon: Brain, label: "AI-trener", href: "/dashboard/coach" },
+  { icon: MessageSquare, label: "Juster uken", href: "/dashboard/chat" },
   { icon: TrendingUp, label: "Fremgang", href: "/dashboard/progress" },
   { icon: Zap, label: "Styrke", href: "/dashboard/strength" },
   { icon: ClipboardList, label: "Ukerapport", href: "/dashboard/checkin" },
+  { icon: User, label: "Treningsprofil", href: "/dashboard/truth" },
   { icon: Timer, label: "Tidsprediksjon", href: "/dashboard/predict" },
   { icon: Settings, label: "Innstillinger", href: "/dashboard/settings" },
 ];

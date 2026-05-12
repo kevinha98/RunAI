@@ -265,6 +265,13 @@ export async function POST(req: NextRequest) {
     await writeUserStats(userId, stats);
     revalidatePath("/dashboard");
 
+    // Fire-and-forget: refresh athlete profile with updated Strava data
+    if (userId) {
+      import("@/app/api/profile/refresh/route")
+        .then(({ refreshAthleteProfile }) => refreshAthleteProfile(userId))
+        .catch(() => {});
+    }
+
     logSyncTimestamp(userId, syncTimestamp, activities.length, runs.length);
 
     // If called from a browser form (Accept: text/html), redirect back to dashboard

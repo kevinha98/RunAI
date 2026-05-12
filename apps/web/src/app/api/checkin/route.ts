@@ -6,6 +6,8 @@ import { formatPace } from "@/lib/strava-types";
 import { createClient } from "@/lib/supabase/server";
 import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import { saveCheckin, getUserCheckins } from "@/lib/db/checkins";
+import { buildProfileBlock } from "@/lib/db/athlete-profile";
+import { refreshAthleteProfile } from "@/app/api/profile/refresh/route";
 import type { PlanAdjustment } from "@/lib/db/checkins";
 import { WEEKS, getCurrentWeek, PLAN_START, TOTAL_WEEKS } from "@/lib/plan-data";
 
@@ -172,8 +174,11 @@ export async function POST(req: NextRequest) {
       weekDate = planWeekMonday(currentWeek);
     }
 
-    // Load user's Strava data and training plan context
-    const stats = await readUserStats(userId);
+    // Load user's Strava data, training plan context, and athlete profile
+    const [stats, profileBlock] = await Promise.all([
+      readUserStats(userId),
+      buildProfileBlock(userId),
+    ]);
     const activitySummary = buildActivitySummary(stats);
     const planWeekText = buildPlanWeekText(currentWeek);
 
@@ -184,6 +189,7 @@ export async function POST(req: NextRequest) {
     const weekSundayISO = new Date(new Date(weekDate).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const systemPrompt = `Du er en erfaren halvmaratontrener som hjelper en løper mot Bergen City Halvmaraton 24. april 2027.
+${profileBlock ? "\n" + profileBlock + "\n" : ""}
 
 DAGENS DATO: ${todayFormatted} (${todayISO})
 GJELDENDE PLANUKE: Uke ${currentWeek}/${TOTAL_WEEKS}
@@ -262,6 +268,11 @@ Analyser uken min og gi meg tilbakemelding. Foreslå eventuelle justeringer til 
       llmAnalysis: analysisText,
       adjustments,
     });
+
+    // Fire-and-forget: refresh athlete profile with new data
+    if (userId) {
+      refreshAthleteProfile(userId).catch(() => {});
+    }
 
     return NextResponse.json({
       id: saved?.id ?? null,

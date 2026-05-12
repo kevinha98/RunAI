@@ -13,6 +13,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import { saveWeekSessions, type SessionEntry } from "@/lib/db/weekly-sessions";
 import { WEEKS, SESSION_ICONS, TOTAL_WEEKS } from "@/lib/plan-data";
+import { buildProfileBlock } from "@/lib/db/athlete-profile";
+import { getUserCheckins } from "@/lib/db/checkins";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
@@ -71,6 +73,25 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = await resolveUserId();
+
+    // Fetch profile + full checkin history for context injection
+    const [profileBlock, checkins] = await Promise.all([
+      userId ? buildProfileBlock(userId) : Promise.resolve(""),
+      userId ? getUserCheckins(userId, 100) : Promise.resolve([]),
+    ]);
+
+    // Build checkin history block (all weeks, oldest first)
+    const checkinHistoryBlock =
+      checkins.length === 0
+        ? "Ingen tidligere ukerapporter."
+        : checkins
+            .slice()
+            .reverse()
+            .map(
+              (c) =>
+                `Uke ${c.weekNumber} (${c.weekDate}): ${c.userReport.slice(0, 200)}${c.userReport.length > 200 ? "\u2026" : ""} | Trener: ${c.llmAnalysis.slice(0, 200)}${c.llmAnalysis.length > 200 ? "\u2026" : ""}`
+            )
+            .join("\n");
 
     // Build the baseline plan for next week
     const nextWeekData = WEEKS.find((w) => w.week === nextWeek) ?? WEEKS[nextWeek - 1];
@@ -152,6 +173,10 @@ Styrke og Hvile har IKKE pace — skriv beskrivelse ("Bein og hofte", "Restitusj
     }
 
     const systemPrompt = `Du er Hildes personlige løpecoach. Lag neste ukes plan basert på hva hun gjennomførte og rapporterte.
+
+${profileBlock ? profileBlock + "\n" : ""}REGEL 6 — HISTORIKK (bruk disse til å forstå Hildes utvikling og trender på tvers av uker):
+${checkinHistoryBlock}
+
 
 ${zonesBlock}
 
