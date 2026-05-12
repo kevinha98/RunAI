@@ -1321,60 +1321,6 @@ export default function DashboardClient({
   const [expandedRun, setExpandedRun] = useState<number | null>(null);
   const [dismissedStatus, setDismissedStatus] = useState(false);
 
-  // ── Coach brief ─────────────────────────────────────────────────────────
-  const COACH_CACHE_KEY = "runai-coach-brief-v1";
-  const COACH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-  const [coachBrief, setCoachBrief] = useState<string | null>(() => {
-    try {
-      const raw = localStorage.getItem(COACH_CACHE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw).brief ?? null;
-    } catch { return null; }
-  });
-  const [coachBriefLoading, setCoachBriefLoading] = useState(true);
-  const [coachBriefTs, setCoachBriefTs] = useState<string | null>(() => {
-    try {
-      const raw = localStorage.getItem(COACH_CACHE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw).generatedAt ?? null;
-    } catch { return null; }
-  });
-
-  useEffect(() => {
-    // If cache is fresh, skip fetching
-    try {
-      const raw = localStorage.getItem(COACH_CACHE_KEY);
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (cached.brief && cached.generatedAt) {
-          const age = Date.now() - new Date(cached.generatedAt).getTime();
-          if (age < COACH_CACHE_TTL_MS) {
-            setCoachBriefLoading(false);
-            return;
-          }
-        }
-      }
-    } catch { /* ignore */ }
-
-    fetch("/api/coach-brief")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.brief) {
-          setCoachBrief(d.brief);
-          setCoachBriefTs(d.generatedAt ?? null);
-          try {
-            localStorage.setItem(COACH_CACHE_KEY, JSON.stringify({
-              brief: d.brief,
-              generatedAt: d.generatedAt ?? new Date().toISOString(),
-            }));
-          } catch { /* ignore */ }
-        }
-      })
-      .catch(() => {/* silent */})
-      .finally(() => setCoachBriefLoading(false));
-  }, []);
-
   // ── Editering av ukens plan ──────────────────────────────────────────────
   type EditableSession = {
     id: string;
@@ -1839,44 +1785,6 @@ export default function DashboardClient({
         {/* ── Tab: Oversikt ── */}
         {activeTab === "oversikt" && (
           <div>
-            {/* Coach brief */}
-            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-[#FC5200]" />
-                <span className="text-xs font-semibold text-[#FC5200] uppercase tracking-wide">Coachens situasjonsbilde</span>
-                <InfoPopup>
-                  <strong className="block mb-1">Coachens situasjonsbilde</strong>
-                  AI-coachen oppsummerer hva du har gjort siste uke basert på Strava-aktiviteter og øktkommentarer dine, og gir deg en pekepinn på hva som er planen fremover. Oppdateres automatisk én gang i timen.
-                </InfoPopup>
-                {coachBriefTs && (
-                  <span className="ml-auto text-[10px] text-[#9B9B95]">
-                    {new Date(coachBriefTs).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                )}
-              </div>
-              {/* Progress bar while fetching (shown even if cached content is already visible) */}
-              {coachBriefLoading && (
-                <div className="mb-3 h-0.5 w-full bg-[#F0F0EE] rounded-full overflow-hidden relative">
-                  <div className="absolute h-full bg-[#FC5200] rounded-full" style={{ width: "60%", animation: "progressBar 1.8s ease-in-out infinite" }} />
-                </div>
-              )}
-              {coachBriefLoading && !coachBrief ? (
-                <div className="space-y-2">
-                  <div className="h-3 bg-[#F0F0EE] rounded-full w-full animate-pulse" />
-                  <div className="h-3 bg-[#F0F0EE] rounded-full w-5/6 animate-pulse" />
-                  <div className="h-3 bg-[#F0F0EE] rounded-full w-4/6 animate-pulse" />
-                </div>
-              ) : coachBrief ? (
-                <div className="space-y-2">
-                  {coachBrief.split(/\n\n+/).filter(Boolean).map((para, i) => (
-                    <p key={i} className="text-sm text-[#3D3D38] leading-relaxed">{para}</p>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-[#9B9B95]">Ingen statusmelding tilgjengelig.</p>
-              )}
-            </div>
-
             {/* Quick stats */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 hover:border-[#C8C8C4] transition-colors">
