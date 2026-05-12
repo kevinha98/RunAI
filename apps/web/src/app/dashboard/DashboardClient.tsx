@@ -777,11 +777,11 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
 }
 
 // ── Aktivitetstype-konstanter ────────────────────────────────────────────────
-const ACTIVITY_TYPES = ["Styrke", "Rolig jogg", "Intervaller", "Terskelintervaller", "Terskeløkt", "Langtur", "Hvile"] as const;
+const ACTIVITY_TYPES = ["Styrke", "Rolig jogg", "Terskel", "Intervall", "Langtur", "Hvile"] as const;
 type ActivityType = typeof ACTIVITY_TYPES[number];
 const ICON_FOR_TYPE: Record<ActivityType, string> = {
-  "Styrke": "💪", "Rolig jogg": "🏃", "Intervaller": "🔥",
-  "Terskelintervaller": "⚡", "Terskeløkt": "⚡", "Langtur": "🛣️", "Hvile": "😴",
+  "Styrke": "💪", "Rolig jogg": "🏃", "Terskel": "⚡",
+  "Intervall": "🔥", "Langtur": "🛣️", "Hvile": "😴",
 };
 function iconForType(t: string): string {
   return ICON_FOR_TYPE[t as ActivityType] ?? "🏃";
@@ -1196,10 +1196,10 @@ export default function DashboardClient({
   const applyP5kPaces = useCallback((sessions: EditableSession[], fiveK: number): EditableSession[] => {
     const p5k = fiveK; // fiveK is already sec/km
     const PACE_MAP: Record<string, number> = {
-      "Lett løping": p5k + 90,
-      "Langkjøring": p5k + 75,
-      "Terskelløkt": p5k + 20,
-      "Intervall": p5k - 10,
+      "Rolig jogg": p5k + 90,
+      "Langtur":    p5k + 75,
+      "Terskel":    p5k + 20,
+      "Intervall":  p5k - 10,
     };
     return sessions.map((s) => {
       const target = PACE_MAP[s.type];

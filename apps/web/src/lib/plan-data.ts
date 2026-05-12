@@ -1,7 +1,19 @@
-/**
- * Shared training plan data — used by the plan page and the AI coach tools.
- * Race: Bergen City Marathon 24 April 2027.
+﻿/**
+ * Shared training plan data â€” used by the plan page and the AI coach tools.
+ * Program: Halvmaraton sub 2:00, Bergen City Marathon.
  * Plan start: Monday 5 May 2026 (week 1).
+ * Race: 24 April 2027.
+ *
+ * Session types:
+ *  "Rolig jogg"  â€” easy run    (pace: P5k + 90 sek/km)
+ *  "Styrke"      â€” strength
+ *  "Terskel"     â€” threshold   (pace: P5k + 20 sek/km)
+ *  "Intervall"   â€” intervals   (pace: P5k âˆ’ 10 sek/km)
+ *  "Langtur"     â€” long run    (pace: P5k + 75 sek/km)
+ *  "Hvile"       â€” rest
+ *
+ * For Terskel/Intervall sessions `distance` holds the interval format
+ * ("5Ã—1000 m", "4Ã—8 min") â€” NOT kilometres.
  */
 
 export type Phase = "Grunntrening" | "Bygging" | "Topp" | "Nedtrapping";
@@ -25,7 +37,7 @@ export const PLAN_START = new Date(2026, 4, 5); // 5 May 2026
 export const RACE_DATE = new Date(2027, 3, 24); // 24 April 2027
 export const TOTAL_WEEKS = 52;
 
-/** Returns the current plan week number (1-based), clamped to 1–TOTAL_WEEKS. */
+/** Returns the current plan week number (1-based), clamped to 1â€“TOTAL_WEEKS. */
 export function getCurrentWeek(): number {
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   const elapsed = Date.now() - PLAN_START.getTime();
@@ -33,661 +45,161 @@ export function getCurrentWeek(): number {
 }
 
 export const SESSION_ICONS: Record<string, string> = {
-  "Lett løping": "🏃",
-  Styrke: "💪",
-  Terskelløkt: "⚡",
-  Intervall: "🔥",
-  Langkjøring: "🛣️",
-  Hvile: "😴",
-  Mobilitet: "🧘",
+  "Rolig jogg": "ðŸƒ",
+  Styrke:       "ðŸ’ª",
+  Terskel:      "âš¡",
+  Intervall:    "ðŸ”¥",
+  Langtur:      "ðŸ›£ï¸",
+  Hvile:        "ðŸ˜´",
 };
 
-/** Returns a short interval description for display in session cards, e.g. "5×1000 m" or "3×15 min". */
+/**
+ * Returns an interval badge string when the distance field already contains
+ * interval notation (e.g. "5Ã—1000 m" or "3Ã—10 min").
+ */
 export function getIntervalLabel(type: string, distStr: string): string | undefined {
-  if (type !== "Terskel\u00f8kt" && type !== "Intervall" && type !== "Terskelintervall") return undefined;
-  const km = parseFloat(distStr);
-  if (isNaN(km) || km <= 0) return undefined;
-
-  if (type === "Intervall") {
-    // ~4 km warmup+cooldown, 1 km per rep
-    const reps = Math.max(4, Math.round(km - 4));
-    return `${reps}\u00d71000 m`;
-  }
-
-  // Terskel\u00f8kt — time-based
-  if (km <= 8) return "2\u00d720 min";
-  if (km <= 10) return "3\u00d715 min";
-  if (km <= 11) return "3\u00d715 min";
-  return "4\u00d712 min";
+  if (type !== "Terskel" && type !== "Intervall") return undefined;
+  if (!distStr || distStr === "â€”") return undefined;
+  // distStr IS the interval format â€” return it as the badge label
+  if (distStr.includes("Ã—") || /\d+\s*min/.test(distStr)) return distStr;
+  return undefined;
 }
 
-export const WEEKS: Week[] = [
-  {
-    week: 1, phase: "Grunntrening", totalKm: 32,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "6 km", pace: "6:00/km", icon: "🏃" },
-      { day: "Tir", type: "Styrke", distance: "30 min", pace: "Kjerneaktivering", icon: "💪" },
-      { day: "Ons", type: "Lett løping", distance: "8 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "6 km", pace: "6:00/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "12 km", pace: "6:10/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
+// ─── Halvmaraton-program (programmatisk generert) ───────────────────────────
+
+function getPhase(w: number): Phase {
+  if (w <= 12) return "Grunntrening";
+  if (w <= 24) return "Bygging";
+  if (w <= 42) return "Topp";
+  return "Nedtrapping";
+}
+
+function buildWeeks(): Week[] {
+  // Terskel-format per fase (indeks = uke-i-fase 0-basert)
+  const TERSKEL: Record<Phase, string[]> = {
+    Grunntrening: [
+      "4×8 min","5×8 min","3×10 min","4×6 min",   // uke 1–4
+      "5×8 min","3×10 min","4×10 min","3×8 min",   // uke 5–8
+      "3×12 min","4×10 min","4×12 min","4×6 min",  // uke 9–12
     ],
-  },
-  {
-    week: 2, phase: "Grunntrening", totalKm: 36,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "7 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tir", type: "Styrke", distance: "35 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Ons", type: "Terskelløkt", distance: "8 km", pace: "5:05/km", icon: "⚡" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "6 km", pace: "6:00/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "15 km", pace: "6:05/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Dynamisk", icon: "🧘" },
+    Bygging: [
+      "2×20 min","25 min","2×20 min","2×15 min",   // uke 13–16
+      "30 min","2×20 min","35 min","2×15 min",     // uke 17–20
+      "40 min","35 min","40 min","2×15 min",       // uke 21–24
     ],
-  },
-  {
-    week: 3, phase: "Grunntrening", totalKm: 40,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tir", type: "Styrke", distance: "40 min", pace: "Full kropp", icon: "💪" },
-      { day: "Ons", type: "Terskelløkt", distance: "10 km", pace: "5:00/km", icon: "⚡" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "6 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "16 km", pace: "6:00/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
+    Topp: [
+      "40 min","3×15 min","45 min","2×15 min",     // uke 25–28
+      "45 min","3×15 min","50 min","2×15 min",     // uke 29–32
+      "50 min","3×15 min","45 min","2×15 min",     // uke 33–36
+      "40 min","3×12 min","35 min","2×12 min",     // uke 37–40
+      "30 min","3×10 min",                          // uke 41–42
     ],
-  },
-  {
-    week: 4, phase: "Grunntrening", totalKm: 32,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "6 km", pace: "6:00/km", icon: "🏃" },
-      { day: "Tir", type: "Mobilitet", distance: "25 min", pace: "Aktiv restitusjon", icon: "🧘" },
-      { day: "Ons", type: "Lett løping", distance: "8 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "6 km", pace: "6:05/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "12 km", pace: "6:10/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
+    Nedtrapping: [
+      "3×10 min","25 min","3×8 min","20 min",      // uke 43–46
+      "2×10 min","15 min","10 min","2×8 min",      // uke 47–50
+      "10 min","—",                                 // uke 51–52
     ],
-  },
-  {
-    week: 5, phase: "Bygging", totalKm: 44,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Tir", type: "Styrke", distance: "45 min", pace: "Løpeøvelser", icon: "💪" },
-      { day: "Ons", type: "Terskelløkt", distance: "10 km", pace: "4:50/km", icon: "⚡" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "6 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "18 km", pace: "6:00/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 6, phase: "Bygging", totalKm: 48,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "9 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "10 km", pace: "4:30/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "10 km", pace: "4:48/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "40 min", pace: "Bein og kjernen", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "7 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "19 km", pace: "5:55/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 7, phase: "Bygging", totalKm: 50,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "9 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "12 km", pace: "4:45/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "7 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "20 km", pace: "5:55/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 8, phase: "Bygging", totalKm: 40,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "7 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "8 km", pace: "4:50/km", icon: "⚡" },
-      { day: "Ons", type: "Mobilitet", distance: "25 min", pace: "Aktiv restitusjon", icon: "🧘" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "6 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "14 km", pace: "6:05/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 9, phase: "Topp", totalKm: 54,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "9 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "11 km", pace: "4:25/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "12 km", pace: "4:42/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "21 km", pace: "5:50/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 10, phase: "Topp", totalKm: 56,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "12 km", pace: "4:22/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "12 km", pace: "4:40/km", icon: "⚡" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "22 km", pace: "5:48/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 11, phase: "Nedtrapping", totalKm: 42,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "8 km", pace: "4:42/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "30 min", pace: "Lett", icon: "💪" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "6 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "16 km", pace: "5:55/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 12, phase: "Nedtrapping", totalKm: 28,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "6 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tir", type: "Lett løping", distance: "5 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Ons", type: "Mobilitet", distance: "20 min", pace: "Lett", icon: "🧘" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "4 km", pace: "6:00/km", icon: "🏃" },
-      { day: "Lør", type: "Hvile", distance: "—", pace: "Forberedelse", icon: "😴" },
-      { day: "Søn", type: "LØP!", distance: "21,1 km", pace: "Målfart!", icon: "🏅" },
-    ],
-  },
-  // --- Uke 13–26: Bygging ---
-  {
-    week: 13, phase: "Bygging", totalKm: 48,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "10 km", pace: "4:55/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "40 min", pace: "Bein og kjernen", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "8 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "20 km", pace: "5:55/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 14, phase: "Bygging", totalKm: 51,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "9 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "11 km", pace: "4:25/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "10 km", pace: "4:52/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "40 min", pace: "Full kropp", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "7 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "22 km", pace: "5:50/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 15, phase: "Bygging", totalKm: 54,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "12 km", pace: "4:50/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "24 km", pace: "5:50/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 16, phase: "Bygging", totalKm: 38,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "7 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tir", type: "Mobilitet", distance: "25 min", pace: "Aktiv restitusjon", icon: "🧘" },
-      { day: "Ons", type: "Lett løping", distance: "8 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "6 km", pace: "6:00/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "14 km", pace: "6:05/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 17, phase: "Bygging", totalKm: 54,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "9 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "11 km", pace: "4:22/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "11 km", pace: "4:50/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "8 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "23 km", pace: "5:50/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 18, phase: "Bygging", totalKm: 57,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "12 km", pace: "4:48/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "9 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "25 km", pace: "5:48/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 19, phase: "Bygging", totalKm: 60,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "12 km", pace: "4:20/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "12 km", pace: "4:47/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "27 km", pace: "5:45/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 20, phase: "Bygging", totalKm: 40,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "7 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tir", type: "Mobilitet", distance: "25 min", pace: "Aktiv restitusjon", icon: "🧘" },
-      { day: "Ons", type: "Lett løping", distance: "8 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Terskelløkt", distance: "8 km", pace: "4:52/km", icon: "⚡" },
-      { day: "Lør", type: "Langkjøring", distance: "15 km", pace: "6:00/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 21, phase: "Bygging", totalKm: 57,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "12 km", pace: "4:18/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "12 km", pace: "4:45/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "25 km", pace: "5:45/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 22, phase: "Bygging", totalKm: 60,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "13 km", pace: "4:45/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "9 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "28 km", pace: "5:45/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 23, phase: "Bygging", totalKm: 62,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "13 km", pace: "4:18/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "13 km", pace: "4:43/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "9 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "29 km", pace: "5:43/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 24, phase: "Bygging", totalKm: 65,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "14 km", pace: "4:42/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "10 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "30 km", pace: "5:42/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 25, phase: "Bygging", totalKm: 62,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "12 km", pace: "4:18/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "12 km", pace: "4:43/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "29 km", pace: "5:43/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 26, phase: "Bygging", totalKm: 60,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "13 km", pace: "4:43/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "28 km", pace: "5:45/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  // --- Uke 27–36: Bygging (topp) ---
-  {
-    week: 27, phase: "Bygging", totalKm: 55,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "9 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "12 km", pace: "4:43/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Bein og kjernen", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "24 km", pace: "5:45/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 28, phase: "Bygging", totalKm: 58,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "12 km", pace: "4:18/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "11 km", pace: "4:42/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "27 km", pace: "5:43/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 29, phase: "Bygging", totalKm: 62,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "14 km", pace: "4:42/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "29 km", pace: "5:42/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Dynamisk", icon: "🧘" },
-    ],
-  },
-  {
-    week: 30, phase: "Bygging", totalKm: 65,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "13 km", pace: "4:15/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "13 km", pace: "4:40/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "30 km", pace: "5:40/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 31, phase: "Bygging", totalKm: 68,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "14 km", pace: "4:40/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "10 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "32 km", pace: "5:40/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 32, phase: "Bygging", totalKm: 44,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tir", type: "Mobilitet", distance: "25 min", pace: "Aktiv restitusjon", icon: "🧘" },
-      { day: "Ons", type: "Lett løping", distance: "9 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Terskelløkt", distance: "9 km", pace: "4:45/km", icon: "⚡" },
-      { day: "Lør", type: "Langkjøring", distance: "18 km", pace: "5:55/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 33, phase: "Bygging", totalKm: 67,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "13 km", pace: "4:15/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "13 km", pace: "4:40/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "31 km", pace: "5:40/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 34, phase: "Bygging", totalKm: 70,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "12 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "15 km", pace: "4:38/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "10 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "32 km", pace: "5:38/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 35, phase: "Bygging", totalKm: 68,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "13 km", pace: "4:13/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "13 km", pace: "4:38/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "32 km", pace: "5:38/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 36, phase: "Bygging", totalKm: 62,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "14 km", pace: "4:40/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Bein og kjernen", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "29 km", pace: "5:42/km", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  // --- Uke 37–48: Topp ---
-  {
-    week: 37, phase: "Topp", totalKm: 64,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "13 km", pace: "4:12/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "13 km", pace: "4:38/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "30 km", pace: "5:10/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 38, phase: "Topp", totalKm: 66,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "14 km", pace: "4:38/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "10 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "32 km", pace: "5:10/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 39, phase: "Topp", totalKm: 68,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "13 km", pace: "4:10/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "14 km", pace: "4:37/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "10 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "33 km", pace: "5:08/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 40, phase: "Topp", totalKm: 46,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tir", type: "Mobilitet", distance: "25 min", pace: "Aktiv restitusjon", icon: "🧘" },
-      { day: "Ons", type: "Lett løping", distance: "9 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Terskelløkt", distance: "9 km", pace: "4:40/km", icon: "⚡" },
-      { day: "Lør", type: "Langkjøring", distance: "20 km", pace: "5:45/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 41, phase: "Topp", totalKm: 66,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "14 km", pace: "4:37/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "10 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "32 km", pace: "5:08/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 42, phase: "Topp", totalKm: 68,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "13 km", pace: "4:10/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "14 km", pace: "4:37/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "10 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "33 km", pace: "5:08/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 43, phase: "Topp", totalKm: 66,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "14 km", pace: "4:37/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "9 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "35 km", pace: "5:10/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 44, phase: "Topp", totalKm: 46,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tir", type: "Mobilitet", distance: "25 min", pace: "Aktiv restitusjon", icon: "🧘" },
-      { day: "Ons", type: "Lett løping", distance: "9 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Terskelløkt", distance: "9 km", pace: "4:40/km", icon: "⚡" },
-      { day: "Lør", type: "Langkjøring", distance: "20 km", pace: "5:45/km", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 45, phase: "Topp", totalKm: 65,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "11 km", pace: "5:38/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "13 km", pace: "4:10/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "13 km", pace: "4:37/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "45 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "9 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "32 km", pace: "5:08/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 46, phase: "Topp", totalKm: 63,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "14 km", pace: "4:37/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "45 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "9 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "30 km", pace: "5:10/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 47, phase: "Topp", totalKm: 60,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "10 km", pace: "5:40/km", icon: "🏃" },
-      { day: "Tir", type: "Intervall", distance: "12 km", pace: "4:12/km", icon: "🔥" },
-      { day: "Ons", type: "Terskelløkt", distance: "12 km", pace: "4:38/km", icon: "⚡" },
-      { day: "Tor", type: "Styrke", distance: "40 min", pace: "Bein og hofte", icon: "💪" },
-      { day: "Fre", type: "Lett løping", distance: "9 km", pace: "5:43/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "29 km", pace: "5:10/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 48, phase: "Topp", totalKm: 56,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "9 km", pace: "5:42/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "13 km", pace: "4:38/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "40 min", pace: "Full kropp", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "8 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "26 km", pace: "5:12/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  // --- Uke 49–52: Nedtrapping ---
-  {
-    week: 49, phase: "Nedtrapping", totalKm: 52,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "9 km", pace: "5:45/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "11 km", pace: "4:40/km", icon: "⚡" },
-      { day: "Ons", type: "Styrke", distance: "35 min", pace: "Lett", icon: "💪" },
-      { day: "Tor", type: "Lett løping", distance: "8 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Fre", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Lør", type: "Langkjøring", distance: "24 km", pace: "5:15/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Mobilitet", distance: "20 min", pace: "Aktiv hvile", icon: "🧘" },
-    ],
-  },
-  {
-    week: 50, phase: "Nedtrapping", totalKm: 42,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "8 km", pace: "5:48/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "9 km", pace: "4:42/km", icon: "⚡" },
-      { day: "Ons", type: "Mobilitet", distance: "25 min", pace: "Aktiv restitusjon", icon: "🧘" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "7 km", pace: "5:52/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "18 km", pace: "5:20/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 51, phase: "Nedtrapping", totalKm: 32,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "7 km", pace: "5:50/km", icon: "🏃" },
-      { day: "Tir", type: "Terskelløkt", distance: "7 km", pace: "4:45/km", icon: "⚡" },
-      { day: "Ons", type: "Mobilitet", distance: "20 min", pace: "Lett", icon: "🧘" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "5 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Lør", type: "Langkjøring", distance: "13 km", pace: "5:30/km (MP)", icon: "🛣️" },
-      { day: "Søn", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-    ],
-  },
-  {
-    week: 52, phase: "Nedtrapping", totalKm: 30,
-    sessions: [
-      { day: "Man", type: "Lett løping", distance: "6 km", pace: "5:55/km", icon: "🏃" },
-      { day: "Tir", type: "Lett løping", distance: "5 km", pace: "6:00/km", icon: "🏃" },
-      { day: "Ons", type: "Mobilitet", distance: "20 min", pace: "Lett", icon: "🧘" },
-      { day: "Tor", type: "Hvile", distance: "—", pace: "Restitusjon", icon: "😴" },
-      { day: "Fre", type: "Lett løping", distance: "4 km", pace: "6:00/km", icon: "🏃" },
-      { day: "Lør", type: "Hvile", distance: "—", pace: "Forberedelse", icon: "😴" },
-      { day: "Søn", type: "LØP!", distance: "42,2 km", pace: "Målfart!", icon: "🏅" },
-    ],
-  },
-];
+  };
+
+  // Intervall-format: [normal, lett]
+  const INTERVALL: Record<Phase, [string, string]> = {
+    Grunntrening: ["5×1000 m", "4×1000 m"],
+    Bygging:      ["6×1000 m", "5×1000 m"],
+    Topp:         ["6×1000 m", "5×1000 m"],
+    Nedtrapping:  ["4×1000 m", "3×1000 m"],
+  };
+
+  // Langtur km per fase (indeks = uke-i-fase 0-basert)
+  const LANGTUR: Record<Phase, number[]> = {
+    Grunntrening: [10, 11, 12, 10, 13, 14, 15, 11, 15, 16, 16, 12],
+    Bygging:      [16, 17, 17, 13, 18, 18, 19, 14, 19, 20, 20, 15],
+    Topp:         [20, 20, 21, 15, 21, 21, 22, 15, 22, 20, 19, 15, 21, 19, 18, 14, 16, 14],
+    Nedtrapping:  [16, 14, 12, 10, 10, 8, 8, 6, 5, 0],
+  };
+
+  // Styrke-varighet: [normal, lett]
+  const STYRKE: Record<Phase, [string, string]> = {
+    Grunntrening: ["35 min", "30 min"],
+    Bygging:      ["40 min", "30 min"],
+    Topp:         ["40 min", "25 min"],
+    Nedtrapping:  ["25 min", "20 min"],
+  };
+
+  // Rolig km per fase
+  const ROLIG: Record<Phase, number> = {
+    Grunntrening: 5, Bygging: 6, Topp: 7, Nedtrapping: 4,
+  };
+
+  // Terskel-session total km (inkl. innkjøring/nedkjøring) for totalKm-estimat
+  const TERSKEL_KM: Record<Phase, number> = {
+    Grunntrening: 9, Bygging: 11, Topp: 13, Nedtrapping: 7,
+  };
+  const INTERVALL_KM: Record<Phase, number> = {
+    Grunntrening: 9, Bygging: 11, Topp: 11, Nedtrapping: 7,
+  };
+
+  const phaseStart: Record<Phase, number> = {
+    Grunntrening: 1, Bygging: 13, Topp: 25, Nedtrapping: 43,
+  };
+
+  const weeks: Week[] = [];
+
+  for (let w = 1; w <= TOTAL_WEEKS; w++) {
+    const phase = getPhase(w);
+    const isLett = w % 4 === 0;
+    const wip = w - phaseStart[phase]; // 0-basert uke i fasen
+
+    const terskelArr = TERSKEL[phase];
+    const terskelFmt = terskelArr[Math.min(wip, terskelArr.length - 1)];
+
+    const [intervNormal, intervLett] = INTERVALL[phase];
+    const intervallFmt = isLett ? intervLett : intervNormal;
+
+    const langturArr = LANGTUR[phase];
+    const langturKm = langturArr[Math.min(wip, langturArr.length - 1)];
+
+    const roligKm = ROLIG[phase];
+    const [styrkeNormal, styrkeLett] = STYRKE[phase];
+    const styrkeFmt = isLett ? styrkeLett : styrkeNormal;
+
+    const totalKm = roligKm + TERSKEL_KM[phase] + INTERVALL_KM[phase] + langturKm;
+
+    // Siste uke = løpet
+    if (w === TOTAL_WEEKS) {
+      weeks.push({
+        week: w,
+        phase: "Nedtrapping",
+        totalKm: 21,
+        sessions: [
+          { day: "Man", type: "Rolig jogg", distance: "3 km", pace: "6:30/km", icon: "🏃" },
+          { day: "Ons", type: "Rolig jogg", distance: "2 km", pace: "6:30/km", icon: "🏃" },
+          { day: "Søn", type: "Langtur",    distance: "21 km", pace: "Målfart! 🏅", icon: "🏅" },
+        ],
+      });
+      continue;
+    }
+
+    const sessions: Session[] = [
+      { day: "Man", type: "Rolig jogg", distance: `${roligKm} km`, pace: "6:30/km", icon: "🏃" },
+      { day: "Tir", type: "Styrke", distance: styrkeFmt, pace: "Bein, kjerne, overkropp", icon: "💪" },
+    ];
+
+    if (terskelFmt && terskelFmt !== "—") {
+      sessions.push({ day: "Ons", type: "Terskel", distance: terskelFmt, pace: "5:20/km", icon: "⚡" });
+    }
+
+    if (intervallFmt && intervallFmt !== "—") {
+      sessions.push({ day: "Fre", type: "Intervall", distance: intervallFmt, pace: "4:50/km", icon: "🔥" });
+    }
+
+    if (langturKm > 0) {
+      sessions.push({ day: "Søn", type: "Langtur", distance: `${langturKm} km`, pace: "6:15/km", icon: "🛣️" });
+    }
+
+    weeks.push({ week: w, phase, totalKm, sessions });
+  }
+
+  return weeks;
+}
+
+export const WEEKS: Week[] = buildWeeks();
