@@ -55,9 +55,15 @@ function RangeBar({ optimistic, primary, conservative }: { optimistic: number; p
   );
 }
 
-export default function PredictClient() {
-  const [fiveKStr, setFiveKStr] = useState("");
-  const [tenKStr, setTenKStr] = useState("");
+export default function PredictClient({
+  initialFiveK = "",
+  initialTenK = "",
+}: {
+  initialFiveK?: string;
+  initialTenK?: string;
+}) {
+  const [fiveKStr, setFiveKStr] = useState(initialFiveK);
+  const [tenKStr, setTenKStr] = useState(initialTenK);
   const [fiveKValid, setFiveKValid] = useState(true);
   const [tenKValid, setTenKValid] = useState(true);
   const [results, setResults] = useState<{ halfMarathon: PredictorResult; tenKPred?: PredictorResult; marathon: PredictorResult } | null>(null);
@@ -101,9 +107,12 @@ export default function PredictClient() {
         </div>
         <p className="text-xs text-[#9B9B95] mb-5">Fyll inn én eller begge. Format: <code className="bg-[#F5F5F3] px-1 rounded">mm:ss</code> eller <code className="bg-[#F5F5F3] px-1 rounded">h:mm:ss</code></p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <TimeInput label="5K personlig beste" hint="F.eks. 22:14 (mm:ss)" value={fiveKStr} onChange={setFiveKStr} onValidChange={setFiveKValid} testId="input-5k" />
-          <TimeInput label="10K personlig beste" hint="F.eks. 45:30 (mm:ss)" value={tenKStr} onChange={setTenKStr} onValidChange={setTenKValid} testId="input-10k" />
+          <TimeInput label="5K personlig beste" hint={initialFiveK ? `Beste fra Strava: ${initialFiveK}` : "F.eks. 22:14 (mm:ss)"} value={fiveKStr} onChange={setFiveKStr} onValidChange={setFiveKValid} testId="input-5k" />
+          <TimeInput label="10K personlig beste" hint={initialTenK ? `Beste fra Strava: ${initialTenK}` : "F.eks. 45:30 (mm:ss)"} value={tenKStr} onChange={setTenKStr} onValidChange={setTenKValid} testId="input-10k" />
         </div>
+        {initialFiveK && (
+          <p className="mt-2 text-xs text-[#9B9B95]">⚡ Forhåndsutfylt med beste løp fra Strava — juster om nødvendig</p>
+        )}
         {tenKStr.trim() && fiveKStr.trim() && (
           <p className="mt-4 text-xs text-green-600">✓ Begge tider gitt — bruker personlig k-faktor for høyest nøyaktighet</p>
         )}
