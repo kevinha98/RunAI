@@ -570,174 +570,7 @@ function WeeklyProgressBar({ recentRuns }: { recentRuns: StravaActivity[] }) {
   );
 }
 
-// ── ActivityCalendar-komponent ────────────────────────────────────────────────
 
-function ActivityCalendar({ runs }: { runs: StravaActivity[] }) {
-  const heatmap = useMemo(() => buildActivityHeatmap(runs), [runs]);
-  const days = useMemo(() => getLast8WeeksDays(), []);
-  const todayStr = useMemo(() => new Date().toLocaleDateString("sv-SE"), []);
-
-  const weeks: Date[][] = [];
-  for (let w = 0; w < 8; w++) {
-    weeks.push(days.slice(w * 7, w * 7 + 7));
-  }
-
-  const dayLabels = ["M", "T", "O", "T", "F", "L", "S"];
-
-  return (
-    <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-[#111110]">Aktivitetskalender</h3>
-        <span className="text-xs text-[#6B6B65]">Siste 8 uker</span>
-      </div>
-      <div className="flex gap-1 w-full">
-        {/* Dag-etiketter (rad) */}
-        <div className="flex flex-col justify-around pt-4 pr-1 shrink-0">
-          {dayLabels.map((label, i) => (
-            <span key={i} className="text-[9px] text-[#9B9B95] leading-none">
-              {label}
-            </span>
-          ))}
-        </div>
-        {/* Uker som kolonner — fyller full breidd */}
-        <div className="flex gap-1 flex-1 min-w-0">
-          {weeks.map((week, wi) => {
-            const firstDay = week[0];
-            const monthLabel = wi === 0 || firstDay.getDate() <= 7
-              ? firstDay.toLocaleDateString("nb-NO", { month: "short" })
-              : "";
-            return (
-              <div key={wi} className="flex flex-col flex-1 min-w-0 gap-1">
-                <span className="text-[9px] text-[#9B9B95] leading-none h-3 truncate">
-                  {monthLabel}
-                </span>
-                {week.map((day, di) => {
-                  const dateStr = day.toLocaleDateString("sv-SE");
-                  const km = heatmap.get(dateStr) ?? 0;
-                  const colorClass = getDayColor(km);
-                  const isToday = dateStr === todayStr;
-                  const isFuture = day > new Date();
-                  return (
-                    <div
-                      key={di}
-                      title={isFuture ? dateStr : `${dateStr}: ${km > 0 ? km.toFixed(1) + " km" : "Ingen økt"}`}
-                      className={`w-full aspect-square rounded-sm cursor-default transition-opacity hover:opacity-75 ${
-                        isFuture ? "bg-[#F5F5F3] border border-[#EBEBEA]" : colorClass
-                      } ${isToday ? "ring-1 ring-[#FC5200] ring-offset-0" : ""}`}
-                    />
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div className="flex items-center gap-2 mt-3">
-        <span className="text-[10px] text-[#9B9B95]">Mindre</span>
-        <div className="flex gap-1">
-          <div className="w-3 h-3 rounded-sm bg-white border border-gray-200" title="0 km" />
-          <div className="w-3 h-3 rounded-sm bg-green-200" title="< 5 km" />
-          <div className="w-3 h-3 rounded-sm bg-green-500" title="5–10 km" />
-          <div className="w-3 h-3 rounded-sm bg-green-800" title="> 10 km" />
-        </div>
-        <span className="text-[10px] text-[#9B9B95]">Mer</span>
-      </div>
-    </div>
-  );
-}
-
-// ── StreakIndicator-komponent ────────────────────────────────────────────────
-
-function StreakIndicator({ recentRuns }: { recentRuns: StravaActivity[] }) {
-  const streak = useMemo(() => computeWeeklyStreak(recentRuns), [recentRuns]);
-  const grid = useMemo(() => computeConsistencyGrid(recentRuns, 8), [recentRuns]);
-
-  const badgeLabel =
-    streak >= 8 ? "Eliteform 🏆" :
-    streak >= 6 ? "På rull! 💪" :
-    streak >= 4 ? "Bra jobba!" :
-    null;
-
-  const motivationText =
-    streak === 0
-      ? "Kom i gang – logg en økt denne uken!"
-      : streak < 3
-      ? "Bra start! Hold det gående mot maratonstart."
-      : streak < 6
-      ? "Solid konsistens! Du bygger et sterkt grunnlag."
-      : "Imponerende streak! Du er i maratonform 🏅";
-
-  return (
-    <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl" aria-label="treningsstreak ildikon">🔥</span>
-          <div>
-            <p className="text-[10px] text-[#6B6B65] font-medium uppercase tracking-wide leading-none mb-0.5">
-              Treningsstreak
-            </p>
-            <p className="text-2xl font-black text-[#111110] leading-tight tabular-nums">
-              {streak}
-              <span className="text-sm font-medium text-[#6B6B65] ml-1">
-                {streak === 1 ? "uke" : "uker"}
-              </span>
-            </p>
-          </div>
-        </div>
-        {badgeLabel && (
-          <span className="text-xs font-semibold bg-orange-50 text-[#FC5200] border border-orange-200 rounded-full px-2.5 py-0.5">
-            {badgeLabel}
-          </span>
-        )}
-      </div>
-
-      <p className="text-xs text-[#6B6B65] mb-3">{motivationText}</p>
-
-      <div>
-        <p className="text-[10px] text-[#9B9B95] mb-2">Siste 8 uker</p>
-        <div className="flex items-center gap-1.5">
-          {grid.map((active, i) => {
-            const isCurrentWeek = i === grid.length - 1;
-            return (
-              <div
-                key={i}
-                title={active ? `Uke ${i + 1}: Økt gjennomført ✓` : `Uke ${i + 1}: Ingen økt`}
-                className={`rounded-full transition-all duration-200 ${
-                  active
-                    ? isCurrentWeek
-                      ? "bg-[#FC5200] ring-2 ring-[#FC5200] ring-offset-1"
-                      : "bg-emerald-500"
-                    : "bg-[#E5E5E2]"
-                }`}
-                style={{ width: "20px", height: "20px", flexShrink: 0 }}
-              />
-            );
-          })}
-        </div>
-        <div className="flex items-center justify-between mt-1.5">
-          <span className="text-[9px] text-[#9B9B95]">8 uker siden</span>
-          <span className="text-[9px] text-[#9B9B95]">Nå</span>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-[#F0F0EE]">
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-emerald-500" />
-          <span className="text-[9px] text-[#9B9B95]">Økt gjennomført</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-[#FC5200]" />
-          <span className="text-[9px] text-[#9B9B95]">Inneværende uke</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-[#E5E5E2]" />
-          <span className="text-[9px] text-[#9B9B95]">Ingen økt</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Pulserende grønn dot-indikator
 function SyncFreshDot() {
@@ -2104,12 +1937,6 @@ export default function DashboardClient({
                 <p className="text-xs text-[#6B6B65]">Ingen løp registrert ennå</p>
               )}
             </div>
-
-            {/* Aktivitetskalender */}
-            <ActivityCalendar runs={recentRuns} />
-
-            {/* Streak */}
-            <StreakIndicator recentRuns={recentRuns} />
           </div>
         )}
 
@@ -2704,11 +2531,6 @@ export default function DashboardClient({
                 </div>
               )}
             </div>
-
-            {/* Aktivitetskalender */}
-            <ActivityCalendar runs={recentRuns} />
-
-
           </div>
         )}
 
