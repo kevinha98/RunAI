@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
 
     // Fire-and-forget: refresh athlete profile with updated Strava data
     if (userId) {
-      import("@/app/api/profile/refresh/route")
+      import("@/lib/refresh-profile")
         .then(({ refreshAthleteProfile }) => refreshAthleteProfile(userId))
         .catch(() => {});
     }

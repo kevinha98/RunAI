@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import { saveCheckin, getUserCheckins } from "@/lib/db/checkins";
 import { buildProfileBlock } from "@/lib/db/athlete-profile";
-import { refreshAthleteProfile } from "@/app/api/profile/refresh/route";
+import { refreshAthleteProfile } from "@/lib/refresh-profile";
 import { buildMemoryBlock } from "@/lib/db/coach-memory";
 import type { PlanAdjustment } from "@/lib/db/checkins";
 import { WEEKS, getCurrentWeek, PLAN_START, TOTAL_WEEKS } from "@/lib/plan-data";

@@ -7,9 +7,11 @@ import { createServiceClient } from "@/lib/supabase/service";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface PlanAdjustment {
+  weekNum: number;
   day: string;
-  original: string;
-  adjusted: string;
+  field: string;
+  from: string;
+  to: string;
   reason: string;
 }
 

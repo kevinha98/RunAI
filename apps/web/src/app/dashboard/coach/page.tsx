@@ -278,7 +278,7 @@ export default function CoachPage() {
           <div>
             <div className="font-bold text-sm">AI-trener</div>
             <div className="text-xs text-[#FC5200] font-semibold">
-              ● Online · Drevet av Claude{memoryCount > 0 ? ` · ${memoryCount} minner` : ""}
+              {!historyLoaded ? "Laster historikk…" : `● Online · Drevet av Claude${memoryCount > 0 ? ` · ${memoryCount} minner` : ""}`}
             </div>
           </div>
         </div>
