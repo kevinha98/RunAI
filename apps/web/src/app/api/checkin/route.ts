@@ -8,6 +8,7 @@ import { getAnyStravaUserId } from "@/lib/db/user-strava";
 import { saveCheckin, getUserCheckins } from "@/lib/db/checkins";
 import { buildProfileBlock } from "@/lib/db/athlete-profile";
 import { refreshAthleteProfile } from "@/app/api/profile/refresh/route";
+import { buildMemoryBlock } from "@/lib/db/coach-memory";
 import type { PlanAdjustment } from "@/lib/db/checkins";
 import { WEEKS, getCurrentWeek, PLAN_START, TOTAL_WEEKS } from "@/lib/plan-data";
 
@@ -174,11 +175,12 @@ export async function POST(req: NextRequest) {
       weekDate = planWeekMonday(currentWeek);
     }
 
-    // Load user's Strava data, training plan context, athlete profile, and previous checkins
-    const [stats, profileBlock, previousCheckins] = await Promise.all([
+    // Load user's Strava data, training plan context, athlete profile, previous checkins and memory
+    const [stats, profileBlock, previousCheckins, memoryBlock] = await Promise.all([
       readUserStats(userId),
       buildProfileBlock(userId),
       getUserCheckins(userId, 5),
+      buildMemoryBlock(userId),
     ]);
     const activitySummary = buildActivitySummary(stats);
     const planWeekText = buildPlanWeekText(currentWeek);
@@ -205,7 +207,7 @@ export async function POST(req: NextRequest) {
     const weekSundayISO = new Date(new Date(weekDate).getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const systemPrompt = `Du er en erfaren halvmaratontrener som hjelper en løper mot Bergen City Halvmaraton 24. april 2027.
-${profileBlock ? "\n" + profileBlock + "\n" : ""}${prevBlock}
+${memoryBlock ? "\n" + memoryBlock + "\n" : ""}${profileBlock ? "\n" + profileBlock + "\n" : ""}${prevBlock}
 
 DAGENS DATO: ${todayFormatted} (${todayISO})
 GJELDENDE PLANUKE: Uke ${currentWeek}/${TOTAL_WEEKS}

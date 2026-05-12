@@ -18,6 +18,7 @@ import { buildProfileBlock } from "@/lib/db/athlete-profile";
 import { getUserCheckins } from "@/lib/db/checkins";
 import { readUserStats } from "@/lib/stats-store";
 import { formatPace } from "@/lib/strava-types";
+import { buildMemoryBlock } from "@/lib/db/coach-memory";
 import type { SessionEntry } from "@/lib/db/weekly-sessions";
 
 export const maxDuration = 45;
@@ -74,10 +75,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing message or sessions" }, { status: 400 });
     }
 
-    const [profileBlock, stats, checkins] = await Promise.all([
+    const [profileBlock, stats, checkins, memoryBlock] = await Promise.all([
       buildProfileBlock(userId),
       readUserStats(userId),
       getUserCheckins(userId, 5),
+      buildMemoryBlock(userId),
     ]);
 
     // Build recent Strava runs block
@@ -122,7 +124,7 @@ export async function POST(req: NextRequest) {
         : "";
 
     const systemPrompt = `Du er Hildes personlige løpecoach. Du hjelper henne med å justere ukeøktene via chat.
-${profileBlock ? "\n" + profileBlock + "\n" : ""}${stravaBlock}${checkinBlock}
+${memoryBlock ? "\n" + memoryBlock + "\n" : ""}${profileBlock ? "\n" + profileBlock + "\n" : ""}${stravaBlock}${checkinBlock}
 
 GJELDENDE UKEPLAN — Uke ${weekNumber}:
 ${sessionsText}

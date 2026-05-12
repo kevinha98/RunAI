@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Brain, Send, ArrowLeft, Loader2 } from "lucide-react";
+import { Brain, Send, ArrowLeft, Loader2, Trash2 } from "lucide-react";
 
 /** Render markdown-lite: bold, bullet lists, numbered lists, line breaks */
 function MessageContent({ content }: { content: string }) {
@@ -103,12 +103,57 @@ export default function CoachPage() {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [memoryCount, setMemoryCount] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load saved conversation + memory count from DB on mount
+  useEffect(() => {
+    fetch("/api/coach/history")
+      .then((r) => r.json())
+      .then((data) => {
+        const saved: { role: "user" | "assistant"; content: string }[] = data.messages ?? [];
+        if (saved.length > 0) {
+          setMessages([
+            INITIAL_MESSAGE,
+            ...saved.map((m, i) => ({
+              id: `saved-${i}`,
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(),
+            })),
+          ]);
+        }
+        setMemoryCount((data.memories ?? []).length);
+      })
+      .catch(() => {})
+      .finally(() => setHistoryLoaded(true));
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Save conversation to DB (fire-and-forget)
+  const saveHistory = useCallback((msgs: Message[]) => {
+    const payload = msgs
+      .filter((m) => m.role === "user" || (m.role === "assistant" && m.content.trim()))
+      .filter((m) => m.id !== "0") // exclude initial greeting
+      .map((m) => ({ role: m.role, content: m.content }));
+    fetch("/api/coach/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: payload }),
+    }).catch(() => {});
+  }, []);
+
+  async function clearMemory() {
+    if (!confirm("Slette hele samtalehistorikken og minnet? Dette kan ikke angres.")) return;
+    await fetch("/api/coach/history", { method: "DELETE" });
+    setMessages([INITIAL_MESSAGE]);
+    setMemoryCount(0);
+  }
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return;
@@ -120,16 +165,18 @@ export default function CoachPage() {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const updatedWithUser = [...messages, userMessage];
+    setMessages(updatedWithUser);
     setInput("");
     setLoading(true);
 
+    let finalAssistantContent = "";
     try {
       const response = await fetch("/api/coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map((m) => ({
+          messages: updatedWithUser.map((m) => ({
             role: m.role,
             content: m.content,
           })),
@@ -166,6 +213,7 @@ export default function CoachPage() {
               const parsed = JSON.parse(data);
               const delta = parsed.choices?.[0]?.delta?.content ?? "";
               if (delta) {
+                finalAssistantContent += delta;
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMessage.id
@@ -180,6 +228,18 @@ export default function CoachPage() {
           }
         }
       }
+
+      // Save full conversation after streaming completes
+      const finalMessages = [
+        ...updatedWithUser,
+        { ...assistantMessage, content: finalAssistantContent },
+      ];
+      saveHistory(finalMessages);
+      // Refresh memory count in background
+      fetch("/api/coach/history")
+        .then((r) => r.json())
+        .then((d) => setMemoryCount((d.memories ?? []).length))
+        .catch(() => {});
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -217,9 +277,19 @@ export default function CoachPage() {
           </div>
           <div>
             <div className="font-bold text-sm">AI-trener</div>
-            <div className="text-xs text-[#FC5200] font-semibold">● Online · Drevet av Claude</div>
+            <div className="text-xs text-[#FC5200] font-semibold">
+              ● Online · Drevet av Claude{memoryCount > 0 ? ` · ${memoryCount} minner` : ""}
+            </div>
           </div>
         </div>
+        <button
+          onClick={clearMemory}
+          title="Slett samtalehistorikk og minne"
+          className="ml-auto flex items-center gap-1.5 text-xs text-[#9B9B95] hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+        >
+          <Trash2 size={13} />
+          Nullstill minne
+        </button>
       </div>
 
       {/* Messages */}

@@ -8,6 +8,7 @@ import { WEEKS, getCurrentWeek, RACE_DATE, TOTAL_WEEKS } from "@/lib/plan-data";
 import { buildProfileBlock } from "@/lib/db/athlete-profile";
 import { getUserCheckins } from "@/lib/db/checkins";
 import type { WeeklyCheckin } from "@/lib/db/checkins";
+import { buildMemoryBlock } from "@/lib/db/coach-memory";
 import type { StoredStats } from "@/lib/strava-types";
 
 // Allow up to 60 s for the agentic tool loop on Vercel
@@ -449,7 +450,7 @@ export async function POST(req: NextRequest) {
       resolvedUserId = user?.id ?? null;
     }
 
-    // Load stats, profile and checkin history in parallel
+    // Load stats, profile, checkin history and memory in parallel
     const emptyStats: StoredStats = {
       athlete: null,
       computed: { weeklyKm: 0, weeklyRuns: 0, avgPaceSecPerKm: 0, longestRunKm: 0, totalRunsAllTime: 0, totalKmAllTime: 0, ytdKm: 0 },
@@ -458,10 +459,11 @@ export async function POST(req: NextRequest) {
       stravaStats: null,
       lastSync: "",
     };
-    const [stats, profileBlock, checkins]: [StoredStats, string, WeeklyCheckin[]] = await Promise.all([
+    const [stats, profileBlock, checkins, memoryBlock]: [StoredStats, string, WeeklyCheckin[], string] = await Promise.all([
       resolvedUserId ? readUserStats(resolvedUserId) : Promise.resolve(emptyStats),
       resolvedUserId ? buildProfileBlock(resolvedUserId) : Promise.resolve(""),
       resolvedUserId ? getUserCheckins(resolvedUserId, 20) : Promise.resolve([]),
+      resolvedUserId ? buildMemoryBlock(resolvedUserId) : Promise.resolve(""),
     ]);
 
     // Context window management: keep last N messages, always end on a user message
@@ -483,9 +485,8 @@ export async function POST(req: NextRequest) {
 
     const client = getClient();
     const baseSystemPrompt = buildSystemPrompt(stats);
-    const systemPrompt = profileBlock
-      ? `${profileBlock}\n\n${baseSystemPrompt}`
-      : baseSystemPrompt;
+    const parts = [memoryBlock, profileBlock, baseSystemPrompt].filter(Boolean);
+    const systemPrompt = parts.join("\n\n");
 
     for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
       const response = await client.messages.create({
