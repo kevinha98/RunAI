@@ -147,6 +147,10 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const userReport: string = (body.report ?? "").trim();
+    const providedWeekDate: string | undefined =
+      typeof body.weekDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.weekDate)
+        ? body.weekDate
+        : undefined;
 
     if (!userReport || userReport.length < 10) {
       return NextResponse.json({ error: "Rapporten er for kort" }, { status: 400 });
@@ -155,12 +159,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Rapporten er for lang (maks 4000 tegn)" }, { status: 400 });
     }
 
+    // Compute week number — from provided date (backdated) or from today
+    let currentWeek: number;
+    let weekDate: string;
+    if (providedWeekDate) {
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      const elapsed = new Date(providedWeekDate).getTime() - PLAN_START.getTime();
+      currentWeek = Math.min(TOTAL_WEEKS, Math.max(1, Math.floor(elapsed / msPerWeek) + 1));
+      weekDate = providedWeekDate;
+    } else {
+      currentWeek = getCurrentWeek();
+      weekDate = planWeekMonday(currentWeek);
+    }
+
     // Load user's Strava data and training plan context
     const stats = await readUserStats(userId);
-    const currentWeek = getCurrentWeek();
     const activitySummary = buildActivitySummary(stats);
     const planWeekText = buildPlanWeekText(currentWeek);
-    const weekDate = planWeekMonday(currentWeek);
 
     // Date context for LLM
     const today = new Date();

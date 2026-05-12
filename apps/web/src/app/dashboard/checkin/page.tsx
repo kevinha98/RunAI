@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { PLAN_START, TOTAL_WEEKS } from "@/lib/plan-data";
 import Link from "next/link";
 import {
   ClipboardList,
@@ -286,7 +287,18 @@ export default function CheckinPage() {
   const [localHistory, setLocalHistory] = useState<HistoryEntry[]>([]);
   const [expandedLocalId, setExpandedLocalId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reportDate, setReportDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Derive plan week from the selected date
+  const reportWeek = (() => {
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const elapsed = new Date(reportDate).getTime() - PLAN_START.getTime();
+    return Math.min(TOTAL_WEEKS, Math.max(1, Math.floor(elapsed / msPerWeek) + 1));
+  })();
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const isBackdated = reportDate < todayISO;
 
   // Load server history on mount
   useEffect(() => {
@@ -345,7 +357,7 @@ export default function CheckinPage() {
       const res = await fetch("/api/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ report }),
+        body: JSON.stringify({ report, weekDate: reportDate }),
       });
 
       const data = await res.json();
@@ -421,17 +433,38 @@ export default function CheckinPage() {
 
       {/* Write report */}
       <section className="bg-white border border-[#E5E5E2] rounded-2xl p-5 mb-6">
-        <h2 className="text-sm font-bold text-[#111110] mb-3">Hvordan gikk uken?</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-[#111110]">Hvordan gikk uken?</h2>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-[#9B9B95] shrink-0">Dato:</label>
+            <input
+              type="date"
+              value={reportDate}
+              max={todayISO}
+              onChange={(e) => setReportDate(e.target.value || todayISO)}
+              disabled={submitting}
+              className="border border-[#E5E5E2] rounded-lg px-2.5 py-1 text-xs text-[#111110] bg-[#FAFAF9] focus:outline-none focus:ring-2 focus:ring-[#FC5200] focus:ring-opacity-30 transition-all"
+            />
+            <span className={`text-xs font-semibold shrink-0 ${isBackdated ? "text-amber-600" : "text-[#FC5200]"}`}>
+              Uke {reportWeek}
+            </span>
+          </div>
+        </div>
+        {isBackdated && (
+          <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-3">
+            ⏪ Du legger til en gammel rapport (tilbakedatert til {new Date(reportDate).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" })}).
+          </p>
+        )}
         <p className="text-xs text-[#6B6B65] mb-4 leading-relaxed">
-          Skriv fritt om form, energinivå, skader, motivasjon, hva du klarte og hva du ikke klarte.
-          Jo mer du deler, jo bedre råd får du.
+          Skriv fritt om form, energinivå, skader og motivasjon.
+          Ta gjerne med fart, puls og distanse på øktene — jo mer du deler, jo bedre råd får du.
         </p>
         <textarea
           ref={textareaRef}
           value={report}
           onChange={(e) => setReport(e.target.value)}
           rows={7}
-          placeholder="Eks: Langkjøringen lørdag var tung — bena var slitne etter terskeløkten torsdag. Kneet bikka litt på slutten. Ellers god uke, fikk gjort alle øktene..."
+          placeholder="Eks: Langtur lørdag 14 km @ 5:55/km, snittpuls 148 — gikk bra. Terskeløkt torsdag: 3×10 min @ 4:50/km, bena var litt tunge. Kneet litt ømt siste 2 km. Totalt 38 km denne uken, litt sliten men motivert..."
           className="w-full resize-none rounded-xl border border-[#E5E5E2] bg-[#FAFAF9] px-4 py-3 text-sm text-[#111110] placeholder:text-[#C8C8C4] focus:outline-none focus:ring-2 focus:ring-[#FC5200] focus:ring-opacity-30 transition-all"
           disabled={submitting}
         />
