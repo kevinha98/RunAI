@@ -1640,8 +1640,11 @@ export default function DashboardClient({
 
   const isSyncFresh = syncAgeMinutes !== null && syncAgeMinutes < 10;
 
-  const handleSync = useCallback(() => {
-    router.push("/api/strava/sync?redirect=/dashboard");
+  const handleSync = useCallback(async () => {
+    try {
+      await fetch("/api/strava/sync", { method: "POST" });
+    } catch { /* silent */ }
+    router.refresh();
   }, [router]);
 
   // Status banner
