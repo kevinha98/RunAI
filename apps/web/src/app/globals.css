@@ -20,6 +20,12 @@
   box-sizing: border-box;
 }
 
+@keyframes progressBar {
+  0% { transform: translateX(-100%); width: 60%; }
+  50% { transform: translateX(80%); width: 60%; }
+  100% { transform: translateX(200%); width: 60%; }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

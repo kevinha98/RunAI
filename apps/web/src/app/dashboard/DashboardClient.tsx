@@ -1316,17 +1316,53 @@ export default function DashboardClient({
   const [dismissedStatus, setDismissedStatus] = useState(false);
 
   // ── Coach brief ─────────────────────────────────────────────────────────
-  const [coachBrief, setCoachBrief] = useState<string | null>(null);
+  const COACH_CACHE_KEY = "runai-coach-brief-v1";
+  const COACH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+  const [coachBrief, setCoachBrief] = useState<string | null>(() => {
+    try {
+      const raw = localStorage.getItem(COACH_CACHE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw).brief ?? null;
+    } catch { return null; }
+  });
   const [coachBriefLoading, setCoachBriefLoading] = useState(true);
-  const [coachBriefTs, setCoachBriefTs] = useState<string | null>(null);
+  const [coachBriefTs, setCoachBriefTs] = useState<string | null>(() => {
+    try {
+      const raw = localStorage.getItem(COACH_CACHE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw).generatedAt ?? null;
+    } catch { return null; }
+  });
 
   useEffect(() => {
+    // If cache is fresh, skip fetching
+    try {
+      const raw = localStorage.getItem(COACH_CACHE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached.brief && cached.generatedAt) {
+          const age = Date.now() - new Date(cached.generatedAt).getTime();
+          if (age < COACH_CACHE_TTL_MS) {
+            setCoachBriefLoading(false);
+            return;
+          }
+        }
+      }
+    } catch { /* ignore */ }
+
     fetch("/api/coach-brief")
       .then((r) => r.json())
       .then((d) => {
         if (d.brief) {
           setCoachBrief(d.brief);
           setCoachBriefTs(d.generatedAt ?? null);
+          try {
+            localStorage.setItem(COACH_CACHE_KEY, JSON.stringify({
+              brief: d.brief,
+              generatedAt: d.generatedAt ?? new Date().toISOString(),
+            }));
+          } catch { /* ignore */ }
         }
       })
       .catch(() => {/* silent */})
@@ -1721,7 +1757,13 @@ export default function DashboardClient({
                   </span>
                 )}
               </div>
-              {coachBriefLoading ? (
+              {/* Progress bar while fetching (shown even if cached content is already visible) */}
+              {coachBriefLoading && (
+                <div className="mb-3 h-0.5 w-full bg-[#F0F0EE] rounded-full overflow-hidden relative">
+                  <div className="absolute h-full bg-[#FC5200] rounded-full" style={{ width: "60%", animation: "progressBar 1.8s ease-in-out infinite" }} />
+                </div>
+              )}
+              {coachBriefLoading && !coachBrief ? (
                 <div className="space-y-2">
                   <div className="h-3 bg-[#F0F0EE] rounded-full w-full animate-pulse" />
                   <div className="h-3 bg-[#F0F0EE] rounded-full w-5/6 animate-pulse" />
