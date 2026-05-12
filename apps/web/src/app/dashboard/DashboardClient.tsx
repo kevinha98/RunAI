@@ -1896,65 +1896,155 @@ export default function DashboardClient({
               </div>
             )}
 
+            {/* P5k Treningstempo */}
+            {(() => {
+              // Candidate paces from recent runs near 5km (4250–5750m)
+              const fiveKRuns = recentRuns
+                .filter((r) => r.distance >= 4250 && r.distance <= 5750 && r.moving_time > 0)
+                .map((r) => ({
+                  secPerKm: Math.round(r.moving_time / (r.distance / 1000)),
+                  date: r.start_date_local ?? r.start_date ?? "",
+                }))
+                .sort((a, b) => a.secPerKm - b.secPerKm); // fastest first
+
+              // De-dup within 10s resolution, keep fastest
+              const seen = new Set<number>();
+              const pills: { secPerKm: number; label: string }[] = [];
+              for (const run of fiveKRuns) {
+                const bucket = Math.round(run.secPerKm / 10) * 10;
+                if (!seen.has(bucket)) {
+                  seen.add(bucket);
+                  const m = Math.floor(run.secPerKm / 60);
+                  const s = run.secPerKm % 60;
+                  pills.push({ secPerKm: run.secPerKm, label: `${m}:${String(s).padStart(2,'0')}/km` });
+                }
+                if (pills.length >= 4) break;
+              }
+
+              // If we have a stored value but it's not in pills, add it as "Nåværende" pill
+              if (fiveKSeconds && !pills.some((p) => Math.abs(p.secPerKm - fiveKSeconds) < 5)) {
+                const m = Math.floor(fiveKSeconds / 60);
+                const s = fiveKSeconds % 60;
+                pills.unshift({ secPerKm: fiveKSeconds, label: `${m}:${String(s).padStart(2,'0')}/km` });
+              }
+
+              const fmtPace = (secs: number) => {
+                const m = Math.floor(secs / 60);
+                const s = Math.round(secs % 60);
+                return `${m}:${String(s).padStart(2,'0')}/km`;
+              };
+
+              const applyPace = (secs: number) => {
+                setFiveKSeconds(secs);
+                try { localStorage.setItem('runai-5k-pr', String(secs)); } catch { /* ignore */ }
+              };
+
+              const zones = [
+                { label: 'Terskel', offset: 20, color: 'text-amber-600' },
+                { label: 'Rolig jogg', offset: 90, color: 'text-sky-600' },
+                { label: 'Langtur', offset: 75, color: 'text-emerald-600' },
+                { label: 'Intervall', offset: -10, color: 'text-red-500' },
+              ] as const;
+
+              return (
+                <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="h-4 w-4 text-[#FC5200]" />
+                    <h3 className="text-sm font-bold text-[#111110]">Treningstempo</h3>
+                    <InfoPopup>
+                      <strong className="block mb-1">Treningstempo</strong>
+                      Velg din beste 5 km-fart per km. Sonene beregnes automatisk og brukes av AI-coachen. Pillene er hentet fra dine faktiske Strava-løp.
+                    </InfoPopup>
+                  </div>
+
+                  {/* Input + pills */}
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs text-[#6B6B65] font-medium shrink-0">P5k-fart</span>
+                      <input
+                        key={String(fiveKSeconds)}
+                        type="text"
+                        placeholder="min:ss"
+                        defaultValue={fiveKSeconds ? (() => { const m = Math.floor(fiveKSeconds / 60); const s = Math.round(fiveKSeconds % 60); return `${m}:${String(s).padStart(2,'0')}`; })() : ''}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          const match = val.match(/^(\d+):([0-5]\d)$/);
+                          if (match) applyPace(parseInt(match[1]) * 60 + parseInt(match[2]));
+                        }}
+                        className="w-20 text-center border border-[#E5E5E2] rounded-lg px-2 py-1 text-xs font-semibold bg-white focus:outline-none focus:border-[#FC5200] placeholder-[#C8C8C4]"
+                      />
+                      <span className="text-[10px] text-[#9B9B95]">/km</span>
+                    </div>
+                    {pills.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {pills.map((pill) => {
+                          const isActive = fiveKSeconds !== null && Math.abs(pill.secPerKm - fiveKSeconds) < 5;
+                          return (
+                            <button
+                              key={pill.secPerKm}
+                              onClick={() => applyPace(pill.secPerKm)}
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                                isActive
+                                  ? 'bg-[#FC5200] text-white border-[#FC5200]'
+                                  : 'bg-[#F5F5F3] text-[#3D3D38] border-[#E5E5E2] hover:border-[#FC5200] hover:text-[#FC5200]'
+                              }`}
+                            >
+                              {pill.label}
+                            </button>
+                          );
+                        })}
+                        {fiveKSeconds && (
+                          <button
+                            onClick={() => applyPace(fiveKSeconds - 5)}
+                            className="px-2.5 py-1 rounded-full text-[11px] border border-dashed border-[#C8C8C4] text-[#9B9B95] hover:border-[#FC5200] hover:text-[#FC5200] transition-all"
+                            title="5 sek raskere"
+                          >−5s</button>
+                        )}
+                        {fiveKSeconds && (
+                          <button
+                            onClick={() => applyPace(fiveKSeconds + 5)}
+                            className="px-2.5 py-1 rounded-full text-[11px] border border-dashed border-[#C8C8C4] text-[#9B9B95] hover:border-[#FC5200] hover:text-[#FC5200] transition-all"
+                            title="5 sek tregere"
+                          >+5s</button>
+                        )}
+                      </div>
+                    )}
+                    {pills.length === 0 && !fiveKSeconds && (
+                      <p className="text-[11px] text-[#9B9B95]">Ingen 5 km-løp funnet i Strava — tast inn pace manuelt</p>
+                    )}
+                  </div>
+
+                  {/* Zone table */}
+                  {fiveKSeconds && (
+                    <div className="border-t border-[#F0F0EE] pt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      {zones.map(({ label, offset, color }) => (
+                        <div key={label} className="flex items-center justify-between">
+                          <span className="text-[11px] text-[#6B6B65]">{label}</span>
+                          <span className={`text-[11px] font-bold ${color}`}>{fmtPace(fiveKSeconds + offset)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!fiveKSeconds && (
+                    <div className="border-t border-[#F0F0EE] pt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      {zones.map(({ label, offset, color }) => (
+                        <div key={label} className="flex items-center justify-between">
+                          <span className="text-[11px] text-[#6B6B65]">{label}</span>
+                          <span className="text-[11px] text-[#C8C8C4]">{offset >= 0 ? `P5k +${offset}s` : `P5k ${offset}s`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Halvmaraton-estimat trend */}
             <HalfMarathonTrendCard
               activities={recentActivities}
               fiveKmPrSec={personalBests.fiveKm > 0 ? personalBests.fiveKm : undefined}
               thresholdPaceSec={paceProgress != null ? paceProgress.currentPaceSec : undefined}
             />
-
-            {/* P5k Treningstempo */}
-            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
-              <div className="flex items-center gap-2 mb-3">
-                <Zap className="h-4 w-4 text-[#FC5200]" />
-                <h3 className="text-sm font-bold text-[#111110]">Treningstempo</h3>
-                <InfoPopup>
-                  <strong className="block mb-1">Treningstempo</strong>
-                  Skriv inn din beste fart per km på 5 km (f.eks. 5:30 for 5:30/km). Sonene beregnes automatisk og brukes av AI-coachen til å tilpasse planen din.
-                </InfoPopup>
-              </div>
-              <table className="w-full text-xs">
-                <tbody className="[&>tr>td]:py-2 [&>tr]:border-t [&>tr]:border-[#F0F0EE]">
-                  <tr className="!border-t-0">
-                    <td className="text-[#6B6B65] font-medium">Personlig rekord 5 km</td>
-                    <td className="text-right">
-                      <input
-                        key={String(fiveKSeconds)}
-                        type="text"
-                        placeholder="min/km"
-                        defaultValue={fiveKSeconds ? (() => { const m = Math.floor(fiveKSeconds / 60); const s = Math.round(fiveKSeconds % 60); return `${m}:${String(s).padStart(2,'0')}`; })() : ''}
-                        onBlur={(e) => {
-                          const val = e.target.value.trim();
-                          const match = val.match(/^(\d+):([0-5]\d)$/);
-                          if (match) {
-                            const secs = parseInt(match[1]) * 60 + parseInt(match[2]);
-                            setFiveKSeconds(secs);
-                            try { localStorage.setItem('runai-5k-pr', String(secs)); } catch { /* ignore */ }
-                          }
-                        }}
-                        className="w-20 text-right border border-[#E5E5E2] rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#FC5200] placeholder-[#C8C8C4]"
-                      />
-                    </td>
-                  </tr>
-                  {([
-                    { label: 'Terskel', offset: 20 },
-                    { label: 'Rolig jogg', offset: 90 },
-                    { label: 'Langtur', offset: 75 },
-                    { label: 'Intervall', offset: -10 },
-                  ] as { label: string; offset: number }[]).map(({ label, offset }) => {
-                    const paceStr = fiveKSeconds
-                      ? (() => { const raw = fiveKSeconds + offset; const m = Math.floor(raw / 60); const s = Math.round(raw % 60); return `${m}:${String(s).padStart(2,'0')}/km`; })()
-                      : offset >= 0 ? `P5k + ${offset} sek` : `P5k − ${Math.abs(offset)} sek`;
-                    return (
-                      <tr key={label}>
-                        <td className="text-[#6B6B65]">{label}</td>
-                        <td className="text-right font-semibold text-[#FC5200]">{paceStr}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
 
             {/* PR-kort */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
