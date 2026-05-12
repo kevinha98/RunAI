@@ -96,77 +96,104 @@ export async function POST(req: NextRequest) {
       .map((s) => `${s.day}: ${s.type} ${s.distance} @ ${s.pace}`)
       .join("\n");
 
-    // Beregn P5k-soner — dette er den eneste pacekilden for genererte planer
+    // ── Pace-beregning (P5k-basert) ──────────────────────────────────────────
     const fmt = (s: number) => {
       const m = Math.floor(s / 60), sec = Math.round(s % 60);
       return `${m}:${String(sec).padStart(2, "0")}/km`;
     };
 
-    let zonesBlock = "";
-    if (fiveKSeconds && fiveKSeconds > 0) {
-      const p5k = fiveKSeconds / 5;
-      zonesBlock = `HILDES PERSONLIGE TRENINGSSONER — DISSE ER DE ENESTE GYLDIGE PACE-VERDIENE DU KAN BRUKE:
-- Lett løping: ${fmt(p5k + 75)} (P5k + 75 sek/km) — kun ±5 sek justering tillatt
-- Langkjøring: ${fmt(p5k + 90)} (P5k + 90 sek/km) — kun ±5 sek justering tillatt
-- Terskelløkt: ${fmt(p5k + 20)} (P5k + 20 sek/km) — kun ±5 sek justering tillatt
-- Intervall: ${fmt(p5k - 12)} (P5k − 12 sek/km) — kun ±3 sek justering tillatt
+    /** Parse "M:SS/km" → seconds/km, returns null if unparseable */
+    const parsePace = (pace: string): number | null => {
+      const m = pace.match(/^(\d+):(\d{2})/);
+      if (!m) return null;
+      return parseInt(m[1]) * 60 + parseInt(m[2]);
+    };
 
-MERK: Ignorer alle pace-verdier fra baseline-planen nedenfor — de er generiske og ikke tilpasset Hilde.
-Du MÅ bruke sonene ovenfor som startpunkt, og kun justere basert på tilbakemeldingene.`;
+    // P5k target paces (seconds/km)
+    type ZoneKey = "Lett løping" | "Langkjøring" | "Terskelløkt" | "Intervall";
+    const p5kTargets: Record<ZoneKey, number> | null = (fiveKSeconds && fiveKSeconds > 0)
+      ? (() => {
+          const p5k = fiveKSeconds / 5;
+          return {
+            "Lett løping":  p5k + 75,
+            "Langkjøring":  p5k + 90,
+            "Terskelløkt":  p5k + 20,
+            "Intervall":    p5k - 12,
+          };
+        })()
+      : null;
+
+    // Max allowed drift from the P5k target (seconds)
+    const MAX_DRIFT: Record<ZoneKey, number> = {
+      "Lett løping": 10,
+      "Langkjøring": 10,
+      "Terskelløkt": 8,
+      "Intervall":   5,
+    };
+
+    let zonesBlock = "";
+    if (p5kTargets) {
+      zonesBlock = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGEL 1 — PACE: Du SKAL bruke disse fartene. Ingen unntak.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Lett løping → ${fmt(p5kTargets["Lett løping"])}  (tillatt: ${fmt(p5kTargets["Lett løping"] - MAX_DRIFT["Lett løping"])}–${fmt(p5kTargets["Lett løping"] + MAX_DRIFT["Lett løping"])})
+  Langkjøring → ${fmt(p5kTargets["Langkjøring"])}  (tillatt: ${fmt(p5kTargets["Langkjøring"] - MAX_DRIFT["Langkjøring"])}–${fmt(p5kTargets["Langkjøring"] + MAX_DRIFT["Langkjøring"])})
+  Terskelløkt → ${fmt(p5kTargets["Terskelløkt"])}  (tillatt: ${fmt(p5kTargets["Terskelløkt"] - MAX_DRIFT["Terskelløkt"])}–${fmt(p5kTargets["Terskelløkt"] + MAX_DRIFT["Terskelløkt"])})
+  Intervall   → ${fmt(p5kTargets["Intervall"])}  (tillatt: ${fmt(p5kTargets["Intervall"] - MAX_DRIFT["Intervall"])}–${fmt(p5kTargets["Intervall"] + MAX_DRIFT["Intervall"])})
+
+FORBUDT: bruk ALDRI pace fra baseline-planen — de er generiske og feil for Hilde.
+FORBUDT: skriv ALDRI en pace utenfor tillatt-intervallet ovenfor.
+Styrke og Hvile har IKKE pace — skriv beskrivelse ("Bein og hofte", "Restitusjon").
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     } else {
       zonesBlock = `GENERELLE TRENINGSSONER (brukes kun om ingen 5K-tid er registrert):
-- Lett løping: 6:20/km
-- Langkjøring: 6:30/km
-- Terskelløkt: 5:25/km
-- Intervall: 5:05/km`;
+  Lett løping → 6:20/km  |  Langkjøring → 6:30/km
+  Terskelløkt → 5:25/km  |  Intervall → 5:05/km`;
     }
 
-    const systemPrompt = `Du er Hildes personlige løpecoach med lang erfaring innen utholdenhetstrening for mosjonister. Du skal lage neste ukes plan basert på hva hun faktisk gjennomførte og hva hun rapporterte.
+    const systemPrompt = `Du er Hildes personlige løpecoach. Lag neste ukes plan basert på hva hun gjennomførte og rapporterte.
+
 ${zonesBlock}
-GYLNE JUSTERINGSREGLER — bruk disse per økttype:
+
+REGEL 2 — JUSTERINGSREGLER per økttype:
 
 Rolig jogg (mål: restitusjon, RPE 3–4):
   - Lett (lavere RPE enn ventet): +1–2 km neste gang
   - Riktig (RPE som forventet): behold, evt. små justeringer
   - Hard (høyere RPE enn ventet): senk fart / kort ned distansen
-  - Trend over tid: juster fart gradvis
 
 Langtur (mål: aerob kapasitet, RPE 3–5):
   - Lett: +1–2 km neste gang
   - Riktig: behold, evt. små justeringer
-  - Hard: −20% lengde + litt roligere tempo
-  - Trend over tid: juster fart gradvis
+  - Hard: −20% lengde
 
 Terskelløkt (mål: øke fart, RPE 6–7):
   - Lett: øk volum (flere drag / lenger drag) → deretter øk fart
-  - Riktig: behold, evt. små justeringer
+  - Riktig: behold
   - Hard: senk fart eller reduser volum
-  - Trend over tid: juster fart gradvis
 
 Intervall 1000m (mål: VO2 maks, RPE 8–9):
   - Lett: +1 drag ELLER −5 sek/km
-  - Riktig: behold, evt. små justeringer
-  - Hard: færre drag / mer pause / roligere
-  - Trend over tid: juster fart gradvis
+  - Riktig: behold
+  - Hard: færre drag / mer pause
 
-Generelle regler:
+REGEL 3 — STRUKTUR:
 - Øk aldri langtur og terskel/intervall samme uke
 - 80% av ukens km skal være rolig løping
-- Missede økter: behold terskel og langtur, reduser rolig, legg til Hvile fremfor å kutte alt
-- Strukturen (hvilke dager, hvilke økttyper) følger baseline — ikke oppfinn nye dager
-- Les øktkommentarene nøye — de er den viktigste kilden til RPE-vurderingen
+- Strukturen (dager + økttyper) følger baseline — ikke oppfinn nye dager
+- Missede økter: behold terskel og langtur; legg til Hvile fremfor å kutte alt
+- Les kommentarene nøye — de er den viktigste RPE-kilden
 
-Bruk kun disse typene: Lett løping, Styrke, Terskelløkt, Intervall, Langkjøring, Hvile, Mobilitet
-Styrke og Hvile bruker ikke pace — skriv f.eks. "Bein og hofte" eller "Restitusjon".
+REGEL 4 — GYLDIGE TYPER:
+Lett løping | Styrke | Terskelløkt | Intervall | Langkjøring | Hvile | Mobilitet
 
-FORMAT (returner KUN dette JSON-objektet, ingen tekst utenfor):
+REGEL 5 — FORMAT (returner KUN dette JSON-objektet, null tekst utenfor):
 {
   "sessions": [
     { "day": "Man", "type": "Lett løping", "distance": "6 km", "pace": "6:20/km" },
-    { "day": "Tir", "type": "Styrke", "distance": "30 min", "pace": "Bein og hofte" },
-    ...
+    { "day": "Tir", "type": "Styrke", "distance": "30 min", "pace": "Bein og hofte" }
   ],
-  "coachNote": "Én konkret setning om hva du justerte og hvorfor — referér gjerne til det hun rapporterte."
+  "coachNote": "Én setning: hva ble justert og hvorfor, referér til det hun rapporterte."
 }`;
 
     const userMessage = `GJELDENDE UKE: ${currentWeek}
@@ -199,18 +226,38 @@ Generer neste ukes justerte plan nå.`;
       return NextResponse.json({ error: "LLM returned invalid JSON", raw }, { status: 500 });
     }
 
-    // Map to SessionEntry[]
-    const newSessions: SessionEntry[] = parsed.sessions.map((s, i) => ({
-      id: `w${nextWeek}-llm-${i}`,
-      day: s.day,
-      type: s.type,
-      distance: s.distance,
-      pace: s.pace,
-      icon: SESSION_ICONS[s.type] ?? "🏃",
-      completed: false,
-      completedDay: null,
-      comment: "",
-    }));
+    // Map to SessionEntry[] — enforce P5k paces server-side as hard guardrail
+    const newSessions: SessionEntry[] = parsed.sessions.map((s, i) => {
+      let pace = s.pace;
+
+      // Clamp running session paces to the allowed P5k range
+      if (p5kTargets && s.type in p5kTargets) {
+        const type = s.type as ZoneKey;
+        const target = p5kTargets[type];
+        const maxDrift = MAX_DRIFT[type];
+        const parsed_pace = parsePace(pace);
+        if (parsed_pace !== null) {
+          // Clamp: if LLM strayed too far, pull back to target
+          const clamped = Math.min(Math.max(parsed_pace, target - maxDrift), target + maxDrift);
+          pace = fmt(clamped);
+        } else {
+          // Unparseable → use target directly
+          pace = fmt(target);
+        }
+      }
+
+      return {
+        id: `w${nextWeek}-llm-${i}`,
+        day: s.day,
+        type: s.type,
+        distance: s.distance,
+        pace,
+        icon: SESSION_ICONS[s.type] ?? "🏃",
+        completed: false,
+        completedDay: null,
+        comment: "",
+      };
+    });
 
     // Persist to Supabase
     if (userId) {
