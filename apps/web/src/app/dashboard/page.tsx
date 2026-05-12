@@ -7,7 +7,7 @@ import { getAnyStravaUserId } from "@/lib/db/user-strava";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: Promise<{ strava?: string }>;
+  searchParams: Promise<{ strava?: string; msg?: string }>;
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
@@ -19,7 +19,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   return (
     <div className="min-h-screen bg-[#F5F5F3] text-[#111110] flex">
       <DashboardSidebar stats={stats} activePath="/dashboard" />
-      <DashboardClient stravaData={stats} stravaStatus={params.strava ?? null} />
+      <DashboardClient stravaData={stats} stravaStatus={params.strava ?? null} stravaErrorMsg={params.msg ?? null} />
     </div>
   );
 }

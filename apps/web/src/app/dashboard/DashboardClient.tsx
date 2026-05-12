@@ -1309,9 +1309,11 @@ function HalfMarathonTrendCard({
 export default function DashboardClient({
   stravaData,
   stravaStatus,
+  stravaErrorMsg,
 }: {
   stravaData: StoredStats;
   stravaStatus: string | null;
+  stravaErrorMsg?: string | null;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"oversikt" | "okter" | "statistikk">("oversikt");
@@ -1701,7 +1703,7 @@ export default function DashboardClient({
       : stravaStatus === "reconnect"
       ? "⚠️ Strava-tilkoblingen er utløpt."
       : stravaStatus === "error"
-      ? "❌ Kunne ikke koble til Strava. Prøv igjen."
+      ? `❌ Kunne ikke koble til Strava.${stravaErrorMsg ? ` Feil: ${stravaErrorMsg}` : " Prøv igjen."}`
       : null;
 
   return (
