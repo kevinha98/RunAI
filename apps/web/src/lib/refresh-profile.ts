@@ -72,20 +72,20 @@ export async function refreshAthleteProfile(
   const p5kBlock =
     fiveKSeconds && fiveKSeconds > 0
       ? (() => {
-          const p5k = fiveKSeconds / 5;
+          const p5k = fiveKSeconds; // already sec/km
           const fmt = (s: number) => {
             const m = Math.floor(s / 60);
             const sec = Math.round(s % 60);
             return `${m}:${String(sec).padStart(2, "0")}/km`;
           };
-          return `5K-tid: ${Math.floor(fiveKSeconds / 60)}:${String(Math.round(fiveKSeconds % 60)).padStart(2, "0")}
+          return `P5k-fart: ${Math.floor(fiveKSeconds / 60)}:${String(Math.round(fiveKSeconds % 60)).padStart(2, "0")}/km
 Treningstempo (P5k = ${fmt(p5k)}):
   Rolig jogg: ${fmt(p5k + 90)}
   Langtur: ${fmt(p5k + 75)}
   Terskel: ${fmt(p5k + 20)}
   Intervall: ${fmt(p5k - 10)}`;
         })()
-      : "Ingen 5K-tid registrert.";
+      : "Ingen P5k-fart registrert.";
 
   // Build checkin history block
   const checkinBlock =

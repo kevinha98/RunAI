@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     type ZoneKey = "Lett løping" | "Langkjøring" | "Terskelløkt" | "Intervall";
     const p5kTargets: Record<ZoneKey, number> | null = (fiveKSeconds && fiveKSeconds > 0)
       ? (() => {
-          const p5k = fiveKSeconds / 5;
+          const p5k = fiveKSeconds; // already sec/km
           return {
             "Lett løping":  p5k + 90,
             "Langkjøring":  p5k + 75,

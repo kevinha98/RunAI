@@ -1415,7 +1415,7 @@ export default function DashboardClient({
   /** Override paces for running sessions based on P5k formula.
    *  Only applies to non-completed sessions from the baseline plan. */
   const applyP5kPaces = useCallback((sessions: EditableSession[], fiveK: number): EditableSession[] => {
-    const p5k = fiveK / 5;
+    const p5k = fiveK; // fiveK is already sec/km
     const PACE_MAP: Record<string, number> = {
       "Lett løping": p5k + 90,
       "Langkjøring": p5k + 75,
@@ -1995,6 +1995,59 @@ export default function DashboardClient({
               thresholdPaceSec={paceProgress != null ? paceProgress.currentPaceSec : undefined}
             />
 
+            {/* P5k Treningstempo */}
+            <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="h-4 w-4 text-[#FC5200]" />
+                <h3 className="text-sm font-bold text-[#111110]">Treningstempo</h3>
+                <InfoPopup>
+                  <strong className="block mb-1">Treningstempo</strong>
+                  Skriv inn din beste fart per km på 5 km (f.eks. 5:30 for 5:30/km). Sonene beregnes automatisk og brukes av AI-coachen til å tilpasse planen din.
+                </InfoPopup>
+              </div>
+              <table className="w-full text-xs">
+                <tbody className="[&>tr>td]:py-2 [&>tr]:border-t [&>tr]:border-[#F0F0EE]">
+                  <tr className="!border-t-0">
+                    <td className="text-[#6B6B65] font-medium">Personlig rekord 5 km</td>
+                    <td className="text-right">
+                      <input
+                        key={String(fiveKSeconds)}
+                        type="text"
+                        placeholder="min/km"
+                        defaultValue={fiveKSeconds ? (() => { const m = Math.floor(fiveKSeconds / 60); const s = Math.round(fiveKSeconds % 60); return `${m}:${String(s).padStart(2,'0')}`; })() : ''}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          const match = val.match(/^(\d+):([0-5]\d)$/);
+                          if (match) {
+                            const secs = parseInt(match[1]) * 60 + parseInt(match[2]);
+                            setFiveKSeconds(secs);
+                            try { localStorage.setItem('runai-5k-pr', String(secs)); } catch { /* ignore */ }
+                          }
+                        }}
+                        className="w-20 text-right border border-[#E5E5E2] rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#FC5200] placeholder-[#C8C8C4]"
+                      />
+                    </td>
+                  </tr>
+                  {([
+                    { label: 'Terskel', offset: 20 },
+                    { label: 'Rolig jogg', offset: 90 },
+                    { label: 'Langtur', offset: 75 },
+                    { label: 'Intervall', offset: -10 },
+                  ] as { label: string; offset: number }[]).map(({ label, offset }) => {
+                    const paceStr = fiveKSeconds
+                      ? (() => { const raw = fiveKSeconds + offset; const m = Math.floor(raw / 60); const s = Math.round(raw % 60); return `${m}:${String(s).padStart(2,'0')}/km`; })()
+                      : offset >= 0 ? `P5k + ${offset} sek` : `P5k − ${Math.abs(offset)} sek`;
+                    return (
+                      <tr key={label}>
+                        <td className="text-[#6B6B65]">{label}</td>
+                        <td className="text-right font-semibold text-[#FC5200]">{paceStr}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
             {/* PR-kort */}
             <div className="bg-white border border-[#E5E5E2] rounded-2xl p-4 mb-5 hover:border-[#C8C8C4] transition-colors">
               <div className="flex items-center gap-2 mb-3">
@@ -2447,9 +2500,10 @@ export default function DashboardClient({
                               <td className="font-semibold text-[#111110]">Personlig rekord 5 km</td>
                               <td className="text-right">
                                 <input
+                                  key={String(fiveKSeconds)}
                                   type="text"
-                                  placeholder="mm:ss"
-                                  defaultValue={fiveKSeconds ? (() => { const tot = fiveKSeconds; const m = Math.floor(tot / 60); const s = Math.round(tot % 60); return `${m}:${String(s).padStart(2,'0')}`; })() : ''}
+                                  placeholder="min/km"
+                                  defaultValue={fiveKSeconds ? (() => { const m = Math.floor(fiveKSeconds / 60); const s = Math.round(fiveKSeconds % 60); return `${m}:${String(s).padStart(2,'0')}`; })() : ''}
                                   onBlur={(e) => {
                                     const val = e.target.value.trim();
                                     const match = val.match(/^(\d+):([0-5]\d)$/);
@@ -2469,10 +2523,9 @@ export default function DashboardClient({
                               { label: 'Langtur', offset: 75 },
                               { label: 'Intervall', offset: -10 },
                             ] as { label: string; offset: number }[]).map(({ label, offset }) => {
-                              const p5kSec = fiveKSeconds ? fiveKSeconds / 5 : null;
-                                const paceStr = p5kSec
-                                ? (() => { const raw = p5kSec + offset; const m = Math.floor(raw / 60); const s = Math.round(raw % 60); return `${m}:${String(s).padStart(2,'0')}/km`; })()
-                                : offset >= 0 ? `5k + ${offset} sek/km` : `5k − ${Math.abs(offset)} sek/km`;
+                              const paceStr = fiveKSeconds
+                                ? (() => { const raw = fiveKSeconds + offset; const m = Math.floor(raw / 60); const s = Math.round(raw % 60); return `${m}:${String(s).padStart(2,'0')}/km`; })()
+                                : offset >= 0 ? `P5k + ${offset} sek` : `P5k − ${Math.abs(offset)} sek`;
                               return (
                                 <tr key={label}>
                                   <td className="font-semibold text-[#111110]">{label}</td>

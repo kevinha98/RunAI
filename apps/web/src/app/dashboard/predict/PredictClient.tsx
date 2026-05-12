@@ -78,9 +78,9 @@ export default function PredictClient() {
       const marathon = predict({ fiveK, tenK, targetDist: DIST.MARATHON });
       const tenKPred = fiveKStr.trim() && !tenKStr.trim() ? predict({ fiveK, tenK, targetDist: DIST.TEN_K }) : undefined;
       setResults({ halfMarathon, tenKPred, marathon });
-      // Lagre 5K-tid i localStorage slik at AI-plan-generatoren kan bruke den
+      // Lagre P5k-fart (pace/km) i localStorage slik at AI-plan-generatoren kan bruke den
       if (fiveK) {
-        try { localStorage.setItem("runai-5k-pr", String(Math.round(fiveK))); } catch { /* ignore */ }
+        try { localStorage.setItem("runai-5k-pr", String(Math.round(fiveK / 5))); } catch { /* ignore */ }
       }
     } catch (e) { setError(e instanceof Error ? e.message : "Noe gikk galt"); }
   }, [fiveKStr, tenKStr]);
@@ -207,10 +207,10 @@ export default function PredictClient() {
               const fiveK = parseTime(fiveKStr.trim());
               const p5k = fiveK / 5; // sekunder per km
               const zones = [
-                { label: "Rolig", desc: "Lett jogg, prat-tempo", pace: p5k + 75 },
-                { label: "Langtur", desc: "Kontrollert og jevn", pace: p5k + 90 },
+                { label: "Rolig", desc: "Lett jogg, prat-tempo", pace: p5k + 90 },
+                { label: "Langtur", desc: "Kontrollert og jevn", pace: p5k + 75 },
                 { label: "Terskel", desc: "Komfortabelt ubehagelig", pace: p5k + 20 },
-                { label: "Intervall", desc: "Hard innsats, 1 km drag", pace: p5k - 12 },
+                { label: "Intervall", desc: "Hard innsats, 1 km drag", pace: p5k - 10 },
               ];
               return (
                 <div className="border border-[#E5E5E2] rounded-xl bg-white overflow-hidden">
