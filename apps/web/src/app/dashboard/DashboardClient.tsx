@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -1357,16 +1357,30 @@ export default function DashboardClient({
     setGenerateNote(null);
   };
 
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const saveStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const saveSessions = (sessions: EditableSession[]) => {
     setWeekSessions(sessions);
     // Optimistic localStorage
     try { localStorage.setItem(weekStorageKey(viewingWeek), JSON.stringify(sessions)); } catch { /* ignore */ }
     // Persist to Supabase
+    setSaveStatus("saving");
+    if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
     fetch("/api/sessions", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ week: viewingWeek, sessions }),
-    }).catch(() => { /* silent — localStorage is fallback */ });
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        setSaveStatus("saved");
+        saveStatusTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      })
+      .catch(() => {
+        setSaveStatus("error");
+        saveStatusTimer.current = setTimeout(() => setSaveStatus("idle"), 4000);
+      });
   };
 
   const startEdit = (s: EditableSession) => {
@@ -1988,6 +2002,18 @@ export default function DashboardClient({
               </div>
 
               <div className="flex justify-end items-center gap-2 mb-3">
+                {saveStatus === "saving" && (
+                  <span className="text-[10px] text-[#9B9B95] flex items-center gap-1">
+                    <span className="inline-block w-2.5 h-2.5 border border-[#9B9B95] border-t-transparent rounded-full animate-spin" />
+                    Lagrer…
+                  </span>
+                )}
+                {saveStatus === "saved" && (
+                  <span className="text-[10px] text-emerald-600 font-medium">✓ Lagret</span>
+                )}
+                {saveStatus === "error" && (
+                  <span className="text-[10px] text-red-500 font-medium">⚠ Lagring feilet (kun lokalt)</span>
+                )}
                 <InfoPopup>
                   <strong className="block mb-1">Ukens økter</strong>
                   <p className="mb-1">En liste over øktene du skal gjennom denne uken, hentet fra halvmaratonprogrammet.</p>
