@@ -1806,10 +1806,10 @@ export default function DashboardClient({
               };
 
               const zones = [
-                { label: 'Terskel', offset: 20, color: 'text-amber-600' },
-                { label: 'Rolig jogg', offset: 90, color: 'text-sky-600' },
-                { label: 'Langtur', offset: 75, color: 'text-emerald-600' },
                 { label: 'Intervall', offset: -10, color: 'text-red-500' },
+                { label: 'Terskel', offset: 20, color: 'text-amber-600' },
+                { label: 'Langtur', offset: 75, color: 'text-emerald-600' },
+                { label: 'Rolig jogg', offset: 90, color: 'text-sky-600' },
               ] as const;
 
               return (
@@ -1881,26 +1881,17 @@ export default function DashboardClient({
                   </div>
 
                   {/* Zone table */}
-                  {fiveKSeconds && (
-                    <div className="border-t border-[#F0F0EE] pt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                      {zones.map(({ label, offset, color }) => (
-                        <div key={label} className="flex items-center justify-between">
-                          <span className="text-[11px] text-[#6B6B65]">{label}</span>
-                          <span className={`text-[11px] font-bold ${color}`}>{fmtPace(fiveKSeconds + offset)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {!fiveKSeconds && (
-                    <div className="border-t border-[#F0F0EE] pt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                      {zones.map(({ label, offset, color }) => (
-                        <div key={label} className="flex items-center justify-between">
-                          <span className="text-[11px] text-[#6B6B65]">{label}</span>
-                          <span className="text-[11px] text-[#C8C8C4]">{offset >= 0 ? `P5k +${offset}s` : `P5k ${offset}s`}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="border-t border-[#F0F0EE] pt-3 space-y-1.5">
+                    {zones.map(({ label, offset, color }) => (
+                      <div key={label} className="flex items-center justify-between">
+                        <span className="text-[11px] text-[#6B6B65]">{label}</span>
+                        {fiveKSeconds
+                          ? <span className={`text-[11px] font-bold ${color}`}>{fmtPace(fiveKSeconds + offset)}</span>
+                          : <span className="text-[11px] text-[#C8C8C4]">{offset >= 0 ? `P5k +${offset}s` : `P5k ${offset}s`}</span>
+                        }
+                      </div>
+                    ))}
+                  </div>
                 </div>
               );
             })()}
@@ -2411,10 +2402,10 @@ export default function DashboardClient({
                               </td>
                             </tr>
                             {([
-                              { label: 'Terskel', offset: 20 },
-                              { label: 'Rolig jogg', offset: 90 },
-                              { label: 'Langtur', offset: 75 },
                               { label: 'Intervall', offset: -10 },
+                              { label: 'Terskel', offset: 20 },
+                              { label: 'Langtur', offset: 75 },
+                              { label: 'Rolig jogg', offset: 90 },
                             ] as { label: string; offset: number }[]).map(({ label, offset }) => {
                               const paceStr = fiveKSeconds
                                 ? (() => { const raw = fiveKSeconds + offset; const m = Math.floor(raw / 60); const s = Math.round(raw % 60); return `${m}:${String(s).padStart(2,'0')}/km`; })()
