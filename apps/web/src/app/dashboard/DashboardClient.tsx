@@ -1268,7 +1268,9 @@ export default function DashboardClient({
             try { const s = localStorage.getItem("runai-5k-pr"); return s ? Number(s) : null; } catch { return null; }
           })();
           const sessions = (d.sessions as EditableSession[]);
-          const applied = (fiveK && d.source === "plan") ? applyP5kPaces(sessions, fiveK) : sessions;
+          // Always re-apply current icons (overrides stale cached icons from DB/localStorage)
+          const withIcons = sessions.map((s) => ({ ...s, icon: iconForType(s.type) }));
+          const applied = (fiveK && d.source === "plan") ? applyP5kPaces(withIcons, fiveK) : withIcons;
           setWeekSessions(applied);
           try { localStorage.setItem(weekStorageKey(viewingWeek), JSON.stringify(applied)); } catch { /* ignore */ }
         }
@@ -1276,7 +1278,7 @@ export default function DashboardClient({
       .catch(() => {
         // Offline: fall back to localStorage
         const cached = loadWeekSessionsFromStorage(viewingWeek);
-        if (cached) setWeekSessions(cached);
+        if (cached) setWeekSessions(cached.map((s) => ({ ...s, icon: iconForType(s.type) })));
         else setWeekSessions(blankTemplate(viewingWeek));
       })
       .finally(() => setSessionsLoading(false));
