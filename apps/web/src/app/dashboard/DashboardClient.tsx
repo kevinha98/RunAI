@@ -780,8 +780,12 @@ function PaceTrendChart({ runs }: { runs: StravaActivity[] }) {
 const ACTIVITY_TYPES = ["Styrke", "Rolig jogg", "Terskel", "Intervall", "Langtur", "Hvile"] as const;
 type ActivityType = typeof ACTIVITY_TYPES[number];
 const ICON_FOR_TYPE: Record<ActivityType, string> = {
-  "Styrke": "💪", "Rolig jogg": "🏃", "Terskel": "⚡",
-  "Intervall": "🔥", "Langtur": "🛣️", "Hvile": "😴",
+  "Rolig jogg": "🚶",
+  "Terskel":    "⚡",
+  "Intervall":  "🔥",
+  "Langtur":    "🛣️",
+  "Styrke":     "🏋️",
+  "Hvile":      "😴",
 };
 /** Colored icon chip background per session type */
 const TYPE_CHIP_CLASS: Record<string, string> = {
@@ -2143,15 +2147,13 @@ export default function DashboardClient({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          {/* Row 1: day + type name */}
+                          {/* Row 1: day (only when completed) + type name */}
                           <div className="flex items-center gap-1.5 mb-1">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                              session.completed
-                                ? "bg-emerald-200 text-emerald-800"
-                                : "bg-[#E5E5E2] text-[#6B6B65]"
-                            }`}>
-                              {session.completed ? (session.completedDay ?? session.day) : session.day}
-                            </span>
+                            {session.completed && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-200 text-emerald-800">
+                                {session.completedDay ?? session.day}
+                              </span>
+                            )}
                             <span className={`text-xs font-bold truncate ${session.completed ? "text-emerald-600 line-through" : "text-[#111110]"}`}>
                               {session.type}
                             </span>
