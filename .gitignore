@@ -17,5 +17,8 @@ autonomous/
 coach_chat_state.json
 coach_history.json
 
+# TypeScript build artifacts
+*.tsbuildinfo
+
 # TypeScript incremental build info
 *.tsbuildinfo
