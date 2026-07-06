@@ -13,5 +13,9 @@ apps/web/data/
 
 autonomous/
 
+# Local dev state files
+coach_chat_state.json
+coach_history.json
+
 # TypeScript incremental build info
 *.tsbuildinfo
