@@ -119,7 +119,7 @@ export async function extractAndSaveMemories(
         : "(ingen minner ennå)";
 
     const client = new Anthropic({
-      baseURL: "https://gateway.raicode.no",
+      ...(process.env.LLM_BASE_URL ? { baseURL: process.env.LLM_BASE_URL } : {}),
       apiKey,
       defaultHeaders: { "x-api-key": apiKey },
     });

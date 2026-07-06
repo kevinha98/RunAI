@@ -1,21 +1,23 @@
 /**
- * Centralized LLM client — Radical Gateway (gateway.raicode.no/v1)
+ * Centralized LLM client — Anthropic-compatible gateway or direct API.
  *
- * The gateway is fully Anthropic-API-compatible. All routes import
- * from here so switching models or auth is a single-file change.
+ * All routes import from here so switching providers is a single-file change.
  *
  * Auth priority:
- *  1. RADICAL_GATEWAY_TOKEN  — static API token (recommended for apps)
+ *  1. RADICAL_GATEWAY_TOKEN  — static API token for a gateway
  *  2. ANTHROPIC_API_KEY      — fallback for direct Anthropic access
  *
- * Models (EU-hosted, GDPR-safe):
- *  - eu-sonnet-4-6  →  fast, 1M ctx, default for coach + plan generation
- *  - eu-opus-4-6    →  strongest, 1M ctx, use for complex rewrites
- *  - eu-haiku-4-5   →  cheapest, 200K ctx, use for quick validations
+ * Set LLM_BASE_URL to point at any Anthropic-compatible endpoint.
+ * Leave unset to use the Anthropic API directly.
+ *
+ * Models (set LLM_BASE_URL to a gateway for EU-hosted equivalents):
+ *  - claude-sonnet-4-5  →  fast, large ctx, default for coach + plan generation
+ *  - claude-opus-4-5    →  strongest, use for complex rewrites
+ *  - claude-haiku-4-5   →  cheapest, use for quick validations
  */
 import Anthropic from "@anthropic-ai/sdk";
 
-const GATEWAY_BASE_URL = "https://gateway.raicode.no";
+const GATEWAY_BASE_URL = process.env.LLM_BASE_URL ?? undefined;
 
 function createGatewayClient(): Anthropic {
   const apiKey =
@@ -47,12 +49,12 @@ export const llm = new Proxy({} as Anthropic, {
   },
 });
 
-/** Model IDs available on the Radical Gateway */
+/** Model IDs — update to match your provider's model names */
 export const MODELS = {
-  /** Default: fast, 1M context — use for coach chat + plan generation */
-  SONNET: "eu-sonnet-4-6",
-  /** Heavy: best quality, 1M context — use for complex rewrites */
-  OPUS: "eu-opus-4-6",
-  /** Fast + cheap: 200K context — use for quick classifications */
-  HAIKU: "eu-haiku-4-5",
+  /** Default: fast, large context — use for coach chat + plan generation */
+  SONNET: process.env.LLM_MODEL_SONNET ?? "claude-sonnet-4-5",
+  /** Heavy: best quality — use for complex rewrites */
+  OPUS: process.env.LLM_MODEL_OPUS ?? "claude-opus-4-5",
+  /** Fast + cheap — use for quick classifications */
+  HAIKU: process.env.LLM_MODEL_HAIKU ?? "claude-haiku-4-5",
 } as const;

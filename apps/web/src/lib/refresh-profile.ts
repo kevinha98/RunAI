@@ -21,7 +21,7 @@ function getClient(): Anthropic {
   const apiKey = process.env.RADICAL_GATEWAY_TOKEN ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("Missing LLM credentials");
   return new Anthropic({
-    baseURL: "https://gateway.raicode.no",
+    ...(process.env.LLM_BASE_URL ? { baseURL: process.env.LLM_BASE_URL } : {}),
     apiKey,
     defaultHeaders: { "x-api-key": apiKey },
   });
